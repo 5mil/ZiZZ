@@ -1,5 +1,5 @@
 const std = @import("std");
-const hash = @import("hash.zig");
+const hashmod = @import("hash.zig");
 const consensus = @import("consensus.zig");
 
 /// Minimal Bitcoin-style block header (80 bytes).
@@ -20,10 +20,10 @@ pub const BlockHeader = struct {
         std.mem.writeInt(u32, buf[76..80], self.nonce, .little);
     }
 
-    pub fn hash(self: BlockHeader) [32]u8 {
+    pub fn getHash(self: BlockHeader) [32]u8 {
         var buf: [80]u8 = undefined;
         self.serialize(&buf);
-        return hash.sha256d(&buf);
+        return hashmod.sha256d(&buf);
     }
 };
 
@@ -42,7 +42,7 @@ pub fn createGenesisHeader() BlockHeader {
 
 test "genesis header hashes" {
     const h = createGenesisHeader();
-    const hsh = h.hash();
+    const hsh = h.getHash();
     _ = hsh;
     // In a full implementation we would assert against a mined genesis hash
 }
