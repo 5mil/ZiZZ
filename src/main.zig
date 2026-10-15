@@ -38,11 +38,12 @@ pub fn main() !void {
             \\Name:    {s}
             \\Ticker:  {s}
             \\Magic:   {x:0>2}{x:0>2}{x:0>2}{x:0>2}
-            \\P2P:     {d}
-            \\RPC:     {d}
+            \\Mainnet P2P/RPC: {d}/{d}
+            \\Regtest P2P/RPC: {d}/{d}
             \\Datadir: {s}
             \\HRP:     {s}
-            \\Block time target: {d}s
+            \\Block time: {d}s   Retarget: {d}s
+            \\Coinbase maturity: {d}
             \\Subsidy: poetic triangle ±20 on base 50, period 2100 + slow decay
             \\PoW:     sha256d
             \\Not a monetary product. Engineering target only.
@@ -56,9 +57,13 @@ pub fn main() !void {
             p.magic[3],
             p.default_p2p_port,
             p.default_rpc_port,
+            p.regtest_p2p_port,
+            p.regtest_rpc_port,
             p.datadir,
             p.bech32_hrp,
             p.pow_target_spacing,
+            p.pow_target_timespan,
+            p.coinbase_maturity,
         });
     } else if (std.mem.eql(u8, cmd, "genesis")) {
         const hdr = block.createGenesisHeader();
@@ -85,28 +90,26 @@ pub fn main() !void {
 }
 
 fn runNode(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    var regtest = false;
     var port: u16 = consensus.PARAMS.default_rpc_port;
-    var regtest = true;
 
     for (args[2..]) |arg| {
         if (std.mem.eql(u8, arg, "--regtest")) {
             regtest = true;
+            port = consensus.PARAMS.regtest_rpc_port;
         } else if (std.mem.startsWith(u8, arg, "--rpcport=")) {
             port = try std.fmt.parseInt(u16, arg["--rpcport=".len..], 10);
         }
-    }
-
-    if (!regtest) {
-        std.debug.print("Only --regtest is supported in this launch build.\n", .{});
-        return;
     }
 
     var chain = chainmod.Chain.init(allocator);
     defer chain.deinit();
     try chain.ensureGenesis();
 
-    std.debug.print("ZiZZ regtest node starting (in-memory chain)\n", .{});
+    const mode = if (regtest) "regtest" else "mainnet";
+    std.debug.print("ZiZZ {s} node starting (in-memory chain)\n", .{mode});
     std.debug.print("Genesis tip: {s}\n", .{&chain.tipHashHex()});
+    std.debug.print("RPC port: {d}\n", .{port});
 
     var server = rpcmod.RpcServer.init(allocator, &chain, port);
     try server.start();
@@ -117,16 +120,19 @@ fn printHelp() void {
         \\ZiZZ — pure Zig Bitcoin-family durable test chain
         \\
         \\Usage:
-        \\  zizz node [--regtest] [--rpcport=18448]   Start regtest RPC node
+        \\  zizz node [--regtest] [--rpcport=N]       Start node (mainnet by default)
         \\  zizz subsidy <height>                     Compute poetic block subsidy
         \\  zizz info                                  Show chain identity
         \\  zizz genesis                               Show genesis header hash
         \\  zizz hash <data>                           Compute sha256d
         \\  zizz --help                                This message
         \\
-        \\Launch example:
+        \\Mainnet launch:
+        \\  ./zig-out/bin/zizz node
+        \\  See MAINNET.md
+        \\
+        \\Regtest:
         \\  ./zig-out/bin/zizz node --regtest
-        \\  Then use curl against 127.0.0.1:18448 with user zizz / wick-of-the-ancients
         \\
         \\The wick stays lit.
         \\
