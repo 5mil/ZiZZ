@@ -35,16 +35,22 @@ pub fn subsidyToZiZZ(sats: Amount) f64 {
     return @as(f64, @floatFromInt(sats)) / @as(f64, @floatFromInt(COIN));
 }
 
-/// Chain identity parameters (ZiZZ test chain)
+/// Chain identity parameters
 pub const ChainParams = struct {
     name: []const u8 = "ZiZZ",
     ticker: []const u8 = "ZiZZ",
-    magic: [4]u8 = .{ 0xf1, 0x7a, 0x7a, 0x22 }, // distinct from FIZZ
-    default_p2p_port: u16 = 18447,
-    default_rpc_port: u16 = 18448,
+    magic: [4]u8 = .{ 0xf1, 0x7a, 0x7a, 0x22 }, // distinct from FIZZ f1 7a 7a 1f
+    // Mainnet ports (public test platform)
+    default_p2p_port: u16 = 8338,
+    default_rpc_port: u16 = 8339,
+    // Regtest ports
+    regtest_p2p_port: u16 = 18447,
+    regtest_rpc_port: u16 = 18448,
     datadir: []const u8 = "zizz",
     bech32_hrp: []const u8 = "zizz",
     pow_target_spacing: u32 = 120, // 2 minutes
+    pow_target_timespan: u32 = 24 * 60 * 60, // 1 day retarget
+    coinbase_maturity: u32 = 20,
     subsidy_period: u32 = 2100,
 };
 
