@@ -88,6 +88,12 @@ pub const RpcServer = struct {
             return try self.rpcGenerateToAddress(body);
         } else if (std.mem.eql(u8, method, "getblocktemplate")) {
             return try self.rpcGetBlockTemplate();
+        } else if (std.mem.eql(u8, method, "dumpprivkey")) {
+            return try self.rpcDumpPrivKey(body);
+        } else if (std.mem.eql(u8, method, "sendtoaddress")) {
+            return try self.rpcSendToAddress(body);
+        } else if (std.mem.eql(u8, method, "listbalances")) {
+            return try self.rpcListBalances();
         } else if (std.mem.eql(u8, method, "createwallet")) {
             return try self.allocator.dupe(u8, "{\"jsonrpc\":\"2.0\",\"result\":{\"name\":\"wizard\"},\"id\":1}");
         } else {
@@ -172,6 +178,22 @@ pub const RpcServer = struct {
         return try std.fmt.allocPrint(self.allocator, "{{\"jsonrpc\":\"2.0\",\"result\":{s},\"id\":1}}", .{list_slice});
     }
 
+    fn rpcDumpPrivKey(self: *RpcServer, body: []const u8) ![]const u8 {
+        // Find the address string inside params array
+        // Look for zizz1 address in the body
+        const needle = "zizz1";
+        const pos = std.mem.indexOf(u8, body, needle) orelse return error.BadParam;
+        var end = pos + needle.len;
+        while (end < body.len and body[end] != '"' and body[end] != ']' and body[end] != ',') : (end += 1) {}
+        const addr = body[pos..end];
+        std.debug.print("DUMP lookup addr: {s}\n", .{addr});
+        std.debug.print("keys count: {d}\n", .{self.chain.keys.count()});
+        if (self.chain.dumpPrivKey(addr)) |wif| {
+            return try std.fmt.allocPrint(self.allocator, "{{\"jsonrpc\":\"2.0\",\"result\":\"{s}\",\"id\":1}}", .{&wif});
+        }
+        return try self.allocator.dupe(u8, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-5,\"message\":\"no key\"},\"id\":1}");
+    }
+
     fn rpcGetBlockTemplate(self: *RpcServer) ![]const u8 {
         const height = self.chain.tipHeight() + 1;
         const prev = self.chain.tipHashHex();
@@ -180,4 +202,66 @@ pub const RpcServer = struct {
             \\{{"jsonrpc":"2.0","result":{{"version":1,"previousblockhash":"{s}","transactions":[],"coinbasevalue":{d},"target":"7fffff0000000000000000000000000000000000000000000000000000000000","mintime":0,"curtime":{d},"bits":"207fffff","height":{d},"noncerange":"00000000ffffffff","sigoplimit":80000,"sizelimit":4000000}},"id":1}}
         , .{ &prev, subsidy, @as(u32, @intCast(std.time.timestamp())), height });
     }
+
+    fn rpcSendToAddress(self: *RpcServer, body: []const u8) ![]const u8 {
+        // crude parse: params:["from","to",amount]
+        const from = extractQuoted(body, 0) orelse return error.BadParam;
+        const to = extractQuoted(body, 1) orelse return error.BadParam;
+        const amt_str = extractNumber(body) orelse return error.BadParam;
+        std.debug.print("SEND from={s} to={s} amt_str={s}\n", .{from, to, amt_str});
+        const amount = std.fmt.parseInt(consensus.Amount, amt_str, 10) catch return error.BadParam;
+        self.chain.sendToAddress(from, to, amount) catch |err| {
+            const msg = if (err == error.InsufficientFunds) "insufficient funds" else "send failed";
+            return try std.fmt.allocPrint(self.allocator, "{{\"jsonrpc\":\"2.0\",\"error\":{{\"code\":-6,\"message\":\"{s}\"}},\"id\":1}}", .{msg});
+        };
+        return try self.allocator.dupe(u8, "{\"jsonrpc\":\"2.0\",\"result\":\"sent\",\"id\":1}");
+    }
+
+    fn rpcListBalances(self: *RpcServer) ![]const u8 {
+        const json = try self.chain.listBalances(self.allocator);
+        defer self.allocator.free(json);
+        return try std.fmt.allocPrint(self.allocator, "{{\"jsonrpc\":\"2.0\",\"result\":{s},\"id\":1}}", .{json});
+    }
+
+    fn extractQuoted(body: []const u8, n: usize) ?[]const u8 {
+        const params = std.mem.indexOf(u8, body, "\"params\"") orelse return null;
+        var count: usize = 0;
+        var i: usize = params;
+        while (i < body.len) : (i += 1) {
+            if (body[i] == '"') {
+                const qstart = i + 1;
+                i += 1;
+                while (i < body.len and body[i] != '"') : (i += 1) {}
+                if (i >= body.len) return null;
+                // skip the "params" key itself
+                if (std.mem.eql(u8, body[qstart..i], "params")) continue;
+                if (count == n) return body[qstart..i];
+                count += 1;
+            }
+        }
+        return null;
+    }
+
+    fn extractNumber(body: []const u8) ?[]const u8 {
+        // After the second address quote, find the next integer
+        const params = std.mem.indexOf(u8, body, "\"params\"") orelse return null;
+        var quotes: usize = 0;
+        var i = params;
+        while (i < body.len) : (i += 1) {
+            if (body[i] == '"') {
+                quotes += 1;
+                if (quotes == 4) { // end of second address
+                    i += 1;
+                    while (i < body.len and (body[i] == ',' or body[i] == ' ' or body[i] == ':')) : (i += 1) {}
+                    if (i < body.len and body[i] >= '0' and body[i] <= '9') {
+                        const nstart = i;
+                        while (i < body.len and body[i] >= '0' and body[i] <= '9') : (i += 1) {}
+                        return body[nstart..i];
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
 };
