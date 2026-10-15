@@ -1,5 +1,7 @@
 const std = @import("std");
 const consensus = @import("consensus.zig");
+const block = @import("block.zig");
+const hash = @import("hash.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -31,7 +33,7 @@ pub fn main() !void {
             \\ZiZZ — durable Bitcoin-family test chain (pure Zig)
             \\Name:    {s}
             \\Ticker:  {s}
-            \\Magic:   {x:02}{x:02}{x:02}{x:02}
+            \\Magic:   {x:0>2}{x:0>2}{x:0>2}{x:0>2}
             \\P2P:     {d}
             \\RPC:     {d}
             \\Datadir: {s}
@@ -53,6 +55,23 @@ pub fn main() !void {
             p.bech32_hrp,
             p.pow_target_spacing,
         });
+    } else if (std.mem.eql(u8, cmd, "genesis")) {
+        const hdr = block.createGenesisHeader();
+        const hsh = hdr.hash();
+        const hex = hash.hashToHex(hsh);
+        std.debug.print("Genesis header hash: {s}\n", .{hex});
+        std.debug.print("Timestamp: {d}\n", .{hdr.timestamp});
+        std.debug.print("Bits: 0x{x}\n", .{hdr.bits});
+        std.debug.print("Message: Lo, another ledger of flickering wicks. Mine if you must, but mind the smoke.\n", .{});
+    } else if (std.mem.eql(u8, cmd, "hash")) {
+        if (args.len < 3) {
+            std.debug.print("Usage: zizz hash <hex-or-string>\n", .{});
+            return;
+        }
+        // Simple: hash the raw argument bytes as demo
+        const hsh = hash.sha256d(args[2]);
+        const hex = hash.hashToHex(hsh);
+        std.debug.print("sha256d: {s}\n", .{hex});
     } else if (std.mem.eql(u8, cmd, "--help") or std.mem.eql(u8, cmd, "-h") or std.mem.eql(u8, cmd, "help")) {
         printHelp();
     } else {
@@ -68,17 +87,22 @@ fn printHelp() void {
         \\Usage:
         \\  zizz subsidy <height>   Compute poetic block subsidy at height
         \\  zizz info               Show chain identity and parameters
+        \\  zizz genesis            Show genesis header hash
+        \\  zizz hash <data>        Compute sha256d of a string
         \\  zizz --help             This message
         \\
         \\Example:
         \\  zizz subsidy 0
         \\  zizz subsidy 1050
         \\  zizz info
+        \\  zizz genesis
         \\
         \\The wick stays lit.
     , .{});
 }
 
-test "import consensus" {
+test "modules" {
     _ = consensus;
+    _ = block;
+    _ = hash;
 }
