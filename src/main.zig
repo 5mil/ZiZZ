@@ -57,7 +57,7 @@ pub fn main() !void {
         });
     } else if (std.mem.eql(u8, cmd, "genesis")) {
         const hdr = block.createGenesisHeader();
-        const hsh = hdr.hash();
+        const hsh = hdr.getHash();
         const hex = hash.hashToHex(hsh);
         std.debug.print("Genesis header hash: {s}\n", .{hex});
         std.debug.print("Timestamp: {d}\n", .{hdr.timestamp});
