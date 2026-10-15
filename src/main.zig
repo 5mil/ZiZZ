@@ -2,6 +2,8 @@ const std = @import("std");
 const consensus = @import("consensus.zig");
 const block = @import("block.zig");
 const hash = @import("hash.zig");
+const chainmod = @import("chain.zig");
+const rpcmod = @import("rpc.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -18,7 +20,9 @@ pub fn main() !void {
 
     const cmd = args[1];
 
-    if (std.mem.eql(u8, cmd, "subsidy")) {
+    if (std.mem.eql(u8, cmd, "node")) {
+        try runNode(allocator, args);
+    } else if (std.mem.eql(u8, cmd, "subsidy")) {
         if (args.len < 3) {
             std.debug.print("Usage: zizz subsidy <height>\n", .{});
             return;
@@ -42,6 +46,7 @@ pub fn main() !void {
             \\Subsidy: poetic triangle ±20 on base 50, period 2100 + slow decay
             \\PoW:     sha256d
             \\Not a monetary product. Engineering target only.
+            \\
         , .{
             p.name,
             p.ticker,
@@ -59,7 +64,7 @@ pub fn main() !void {
         const hdr = block.createGenesisHeader();
         const hsh = hdr.getHash();
         const hex = hash.hashToHex(hsh);
-        std.debug.print("Genesis header hash: {s}\n", .{hex});
+        std.debug.print("Genesis header hash: {s}\n", .{&hex});
         std.debug.print("Timestamp: {d}\n", .{hdr.timestamp});
         std.debug.print("Bits: 0x{x}\n", .{hdr.bits});
         std.debug.print("Message: Lo, another ledger of flickering wicks. Mine if you must, but mind the smoke.\n", .{});
@@ -68,10 +73,9 @@ pub fn main() !void {
             std.debug.print("Usage: zizz hash <hex-or-string>\n", .{});
             return;
         }
-        // Simple: hash the raw argument bytes as demo
         const hsh = hash.sha256d(args[2]);
         const hex = hash.hashToHex(hsh);
-        std.debug.print("sha256d: {s}\n", .{hex});
+        std.debug.print("sha256d: {s}\n", .{&hex});
     } else if (std.mem.eql(u8, cmd, "--help") or std.mem.eql(u8, cmd, "-h") or std.mem.eql(u8, cmd, "help")) {
         printHelp();
     } else {
@@ -80,29 +84,51 @@ pub fn main() !void {
     }
 }
 
+fn runNode(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    var port: u16 = consensus.PARAMS.default_rpc_port;
+    var regtest = true;
+
+    for (args[2..]) |arg| {
+        if (std.mem.eql(u8, arg, "--regtest")) {
+            regtest = true;
+        } else if (std.mem.startsWith(u8, arg, "--rpcport=")) {
+            port = try std.fmt.parseInt(u16, arg["--rpcport=".len..], 10);
+        }
+    }
+
+    if (!regtest) {
+        std.debug.print("Only --regtest is supported in this launch build.\n", .{});
+        return;
+    }
+
+    var chain = chainmod.Chain.init(allocator);
+    defer chain.deinit();
+    try chain.ensureGenesis();
+
+    std.debug.print("ZiZZ regtest node starting (in-memory chain)\n", .{});
+    std.debug.print("Genesis tip: {s}\n", .{&chain.tipHashHex()});
+
+    var server = rpcmod.RpcServer.init(allocator, &chain, port);
+    try server.start();
+}
+
 fn printHelp() void {
     std.debug.print(
         \\ZiZZ — pure Zig Bitcoin-family durable test chain
         \\
         \\Usage:
-        \\  zizz subsidy <height>   Compute poetic block subsidy at height
-        \\  zizz info               Show chain identity and parameters
-        \\  zizz genesis            Show genesis header hash
-        \\  zizz hash <data>        Compute sha256d of a string
-        \\  zizz --help             This message
+        \\  zizz node [--regtest] [--rpcport=18448]   Start regtest RPC node
+        \\  zizz subsidy <height>                     Compute poetic block subsidy
+        \\  zizz info                                  Show chain identity
+        \\  zizz genesis                               Show genesis header hash
+        \\  zizz hash <data>                           Compute sha256d
+        \\  zizz --help                                This message
         \\
-        \\Example:
-        \\  zizz subsidy 0
-        \\  zizz subsidy 1050
-        \\  zizz info
-        \\  zizz genesis
+        \\Launch example:
+        \\  ./zig-out/bin/zizz node --regtest
+        \\  Then use curl against 127.0.0.1:18448 with user zizz / wick-of-the-ancients
         \\
         \\The wick stays lit.
+        \\
     , .{});
-}
-
-test "modules" {
-    _ = consensus;
-    _ = block;
-    _ = hash;
 }
