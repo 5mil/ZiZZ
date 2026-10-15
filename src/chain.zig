@@ -1,100 +1,120 @@
 const std = @import("std");
 const consensus = @import("consensus.zig");
 const block = @import("block.zig");
-const hash = @import("hash.zig");
+const hashmod = @import("hash.zig");
 
 pub const Block = struct {
     header: block.BlockHeader,
     height: u32,
     subsidy: consensus.Amount,
-    // Simplified: no full txs yet, just coinbase reward tracked via height
+    coinbase_address: []u8,
 };
 
 pub const Chain = struct {
     allocator: std.mem.Allocator,
     blocks: std.ArrayList(Block),
-    // Simple address -> balance (sats). Addresses are arbitrary strings for regtest.
     balances: std.StringHashMap(consensus.Amount),
+    next_address_id: u32 = 1,
 
-    pub fn init(allocator: std.mem.Allocator) !Chain {
-        var self = Chain{
+    pub fn init(allocator: std.mem.Allocator) Chain {
+        return .{
             .allocator = allocator,
             .blocks = std.ArrayList(Block).init(allocator),
             .balances = std.StringHashMap(consensus.Amount).init(allocator),
         };
-        // Genesis
-        const genesis = block.createGenesisHeader();
-        try self.blocks.append(.{
-            .header = genesis,
-            .height = 0,
-            .subsidy = 0,
-        });
-        return self;
     }
 
     pub fn deinit(self: *Chain) void {
+        for (self.blocks.items) |b| {
+            self.allocator.free(b.coinbase_address);
+        }
         self.blocks.deinit();
-        var it = self.balances.iterator();
-        while (it.next()) |entry| {
-            self.allocator.free(entry.key_ptr.*);
+        var it = self.balances.keyIterator();
+        while (it.next()) |k| {
+            self.allocator.free(k.*);
         }
         self.balances.deinit();
     }
 
-    pub fn height(self: *const Chain) u32 {
-        return @intCast(self.blocks.items.len - 1);
+    pub fn ensureGenesis(self: *Chain) !void {
+        if (self.blocks.items.len > 0) return;
+        const hdr = block.createGenesisHeader();
+        const genesis_addr = try self.allocator.dupe(u8, "zizz1genesis");
+        try self.blocks.append(.{
+            .header = hdr,
+            .height = 0,
+            .subsidy = consensus.getBlockSubsidy(0),
+            .coinbase_address = genesis_addr,
+        });
+        try self.credit(genesis_addr, consensus.getBlockSubsidy(0));
+    }
+
+    pub fn tipHeight(self: *const Chain) u32 {
+        if (self.blocks.items.len == 0) return 0;
+        return self.blocks.items[self.blocks.items.len - 1].height;
     }
 
     pub fn tipHash(self: *const Chain) [32]u8 {
+        if (self.blocks.items.len == 0) return [_]u8{0} ** 32;
         return self.blocks.items[self.blocks.items.len - 1].header.getHash();
     }
 
-    /// Mine nblocks to the given address (regtest style, no real PoW work beyond nonce increment).
-    pub fn generateToAddress(self: *Chain, nblocks: u32, address: []const u8) !void {
-        var i: u32 = 0;
-        while (i < nblocks) : (i += 1) {
-            const next_height = self.height() + 1;
-            const subsidy = consensus.getBlockSubsidy(next_height);
+    pub fn tipHashHex(self: *const Chain) [64]u8 {
+        return hashmod.hashToHex(self.tipHash());
+    }
 
-            var hdr = block.BlockHeader{
-                .version = 1,
-                .prev_block = self.tipHash(),
-                .timestamp = @intCast(std.time.timestamp()),
-                .bits = 0x207fffff, // easy
-                .nonce = 0,
-            };
-            // Fake merkle for now
-            hdr.merkle_root = hash.sha256d(address);
+    pub fn getNewAddress(self: *Chain) ![]const u8 {
+        const id = self.next_address_id;
+        self.next_address_id += 1;
+        const addr = try std.fmt.allocPrint(self.allocator, "zizz1regtest{d}", .{id});
+        try self.balances.put(addr, 0);
+        return addr;
+    }
 
-            // "Mine" by finding a nonce that meets easy bits (trivial for 0x207fffff)
-            while (true) {
-                const h = hdr.getHash();
-                // Very loose check for demo: any nonce works for this bits
-                if (true) break;
-                hdr.nonce += 1;
-            }
-
-            try self.blocks.append(.{
-                .header = hdr,
-                .height = next_height,
-                .subsidy = subsidy,
-            });
-
-            // Credit the address
-            const gop = try self.balances.getOrPut(try self.allocator.dupe(u8, address));
-            if (!gop.found_existing) {
-                gop.value_ptr.* = 0;
-            }
-            gop.value_ptr.* += subsidy;
-        }
+    fn credit(self: *Chain, address: []const u8, amount: consensus.Amount) !void {
+        const entry = self.balances.getEntry(address) orelse blk: {
+            const owned = try self.allocator.dupe(u8, address);
+            try self.balances.put(owned, 0);
+            break :blk self.balances.getEntry(owned).?;
+        };
+        entry.value_ptr.* += amount;
     }
 
     pub fn getBalance(self: *const Chain, address: []const u8) consensus.Amount {
         return self.balances.get(address) orelse 0;
     }
 
-    pub fn getBlockHash(self: *const Chain, height: u32) ?[32]u8 {
-        if (height >= self.blocks.items.len) return null;
-        return self.blocks.items[height].header.getHash();
+    pub fn getTotalBalance(self: *const Chain) consensus.Amount {
+        var total: consensus.Amount = 0;
+        var it = self.balances.valueIterator();
+        while (it.next()) |v| total += v.*;
+        return total;
+    }
+
+    pub fn generateToAddress(self: *Chain, n: u32, address: []const u8) ![][64]u8 {
+        try self.ensureGenesis();
+        const hashes = try self.allocator.alloc([64]u8, n);
+        var i: u32 = 0;
+        while (i < n) : (i += 1) {
+            const height = self.tipHeight() + 1;
+            const subsidy = consensus.getBlockSubsidy(height);
+            var hdr = block.BlockHeader{
+                .version = 1,
+                .prev_block = self.tipHash(),
+                .timestamp = @intCast(std.time.timestamp()),
+                .bits = 0x207fffff,
+                .nonce = i,
+            };
+            const addr_owned = try self.allocator.dupe(u8, address);
+            try self.blocks.append(.{
+                .header = hdr,
+                .height = height,
+                .subsidy = subsidy,
+                .coinbase_address = addr_owned,
+            });
+            try self.credit(address, subsidy);
+            hashes[i] = hashmod.hashToHex(hdr.getHash());
+        }
+        return hashes;
     }
 };
