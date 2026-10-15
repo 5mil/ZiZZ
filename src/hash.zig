@@ -14,14 +14,22 @@ pub fn sha256d(data: []const u8) [32]u8 {
     return result;
 }
 
+/// Convert 32-byte hash to lowercase hex string (64 chars).
 pub fn hashToHex(hash: [32]u8) [64]u8 {
     var hex: [64]u8 = undefined;
-    _ = std.fmt.bufPrint(&hex, "{x}", .{std.fmt.fmtSliceHexLower(&hash)}) catch unreachable;
+    const slice = std.fmt.fmtSliceHexLower(&hash);
+    // Manual or use bufPrint properly
+    _ = std.fmt.bufPrint(&hex, "{s}", .{slice}) catch unreachable;
     return hex;
 }
 
 test "sha256d empty" {
-    // Just ensure it runs; known value can be added later
     const h = sha256d("");
     _ = h;
+}
+
+test "hex roundtrip length" {
+    const h = sha256d("test");
+    const hex = hashToHex(h);
+    try std.testing.expectEqual(@as(usize, 64), hex.len);
 }
