@@ -9,6 +9,8 @@ Goal: A durable, production-quality Bitcoin-family full node implemented **entir
 - [x] sha256d double-SHA256
 - [x] Basic 80-byte block header + genesis stub
 - [x] CLI: subsidy, info, genesis, hash
+- [x] Mainnet / regtest modes with correct ports and chain name
+- [x] MAINNET.md launch docs
 - [x] Pure Zig, zero external deps
 - [x] MIT license, build system
 

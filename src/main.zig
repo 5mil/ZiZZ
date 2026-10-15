@@ -111,7 +111,8 @@ fn runNode(allocator: std.mem.Allocator, args: []const []const u8) !void {
     std.debug.print("Genesis tip: {s}\n", .{&chain.tipHashHex()});
     std.debug.print("RPC port: {d}\n", .{port});
 
-    var server = rpcmod.RpcServer.init(allocator, &chain, port);
+    const chain_name = if (regtest) "regtest" else "main";
+    var server = rpcmod.RpcServer.init(allocator, &chain, port, chain_name);
     try server.start();
 }
 

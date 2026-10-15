@@ -9,14 +9,16 @@ pub const RpcServer = struct {
     port: u16,
     user: []const u8,
     password: []const u8,
+    chain_name: []const u8,
 
-    pub fn init(allocator: std.mem.Allocator, chain: *chainmod.Chain, port: u16) RpcServer {
+    pub fn init(allocator: std.mem.Allocator, chain: *chainmod.Chain, port: u16, chain_name: []const u8) RpcServer {
         return .{
             .allocator = allocator,
             .chain = chain,
             .port = port,
             .user = "zizz",
             .password = "wick-of-the-ancients",
+            .chain_name = chain_name,
         };
     }
 
@@ -105,8 +107,8 @@ pub const RpcServer = struct {
         const height = self.chain.tipHeight();
         const hex = self.chain.tipHashHex();
         return try std.fmt.allocPrint(self.allocator,
-            \\{{"jsonrpc":"2.0","result":{{"chain":"regtest","blocks":{d},"headers":{d},"bestblockhash":"{s}","difficulty":1,"verificationprogress":1,"chainwork":"0000000000000000000000000000000000000000000000000000000000000001","pruned":false,"softforks":[]}},"id":1}}
-        , .{ height, height, &hex });
+            \\{{"jsonrpc":"2.0","result":{{"chain":"{s}","blocks":{d},"headers":{d},"bestblockhash":"{s}","difficulty":1,"verificationprogress":1,"chainwork":"0000000000000000000000000000000000000000000000000000000000000001","pruned":false,"softforks":[]}},"id":1}}
+        , .{ self.chain_name, height, height, &hex });
     }
 
     fn rpcGetBlockCount(self: *RpcServer) ![]const u8 {

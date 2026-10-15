@@ -1,0 +1,12 @@
+# ZiZZ mainnet example conf (public test platform)
+# Place in ~/.zizz/zizz.conf when persistence lands
+
+server=1
+rpcuser=zizz
+rpcpassword=wick-of-the-ancients
+rpcport=8339
+port=8338
+daemon=1
+txindex=1
+fallbackfee=0.0001
+# addnode=your.public.node.ip   # when P2P is ready
