@@ -62,12 +62,14 @@ zig build
 ./zig-out/bin/zizz --help
 ```
 
-### Example
+### Commands
 
 ```bash
-./zig-out/bin/zizz subsidy 0
-./zig-out/bin/zizz subsidy 1050
+./zig-out/bin/zizz subsidy 0      # ~30 ZiZZ
+./zig-out/bin/zizz subsidy 1050   # ~70 ZiZZ
 ./zig-out/bin/zizz info
+./zig-out/bin/zizz genesis
+./zig-out/bin/zizz hash "hello"
 ```
 
 ## Launch (future)
@@ -90,7 +92,7 @@ fallbackfee=0.0001
 
 ## Status
 
-Early foundation. Core consensus parameters, poetic subsidy, and CLI scaffolding are in place. Full P2P, validation, wallet, and RPC are under active construction in pure Zig.
+Early foundation. Core consensus parameters, poetic subsidy, block header, sha256d, and CLI scaffolding are in place. See [ROADMAP.md](ROADMAP.md) for the path to a full node.
 
 The wick stays lit. The hash remains.
 
