@@ -48,6 +48,10 @@ fn walletFrame(chain: *chainmod.Chain) !void {
 
     dvui.label(@src(), "ZiZZ Wallet", .{}, .{});
 
+    var height_buf: [32]u8 = undefined;
+    const height_str = std.fmt.bufPrint(&height_buf, "Height: {d}", .{chain.tipHeight()}) catch "Height: ?";
+    dvui.labelNoFmt(@src(), height_str, .{}, .{});
+
     if (dvui.button(@src(), "Generate 1 Block", .{}, .{})) {
         const addr = try chain.getNewAddress();
         _ = try chain.generateToAddress(1, addr);
@@ -57,10 +61,12 @@ fn walletFrame(chain: *chainmod.Chain) !void {
         _ = try chain.getNewAddress();
     }
 
-    dvui.label(@src(), "Balances (see console for details)", .{}, .{});
+    dvui.label(@src(), "Balances", .{}, .{});
 
     var it = chain.balances.iterator();
     while (it.next()) |entry| {
-        std.debug.print("{s}: {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
+        var buf: [160]u8 = undefined;
+        const line = std.fmt.bufPrint(&buf, "{s}: {d} sats", .{ entry.key_ptr.*, entry.value_ptr.* }) catch continue;
+        dvui.labelNoFmt(@src(), line, .{}, .{});
     }
 }
