@@ -5,13 +5,12 @@ const hash = @import("hash.zig");
 const chainmod = @import("chain.zig");
 const rpcmod = @import("rpc.zig");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init.Minimal) !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try init.args.toSlice(allocator);
 
     if (args.len < 2) {
         printHelp();
@@ -104,7 +103,9 @@ fn runNode(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     var chain = chainmod.Chain.init(allocator);
     defer chain.deinit();
+    std.debug.print("calling ensureGenesis\n", .{});
     try chain.ensureGenesis();
+    std.debug.print("ensureGenesis done, height={d}\n", .{chain.tipHeight()});
 
     const mode = if (regtest) "regtest" else "mainnet";
     std.debug.print("ZiZZ {s} node starting (in-memory chain)\n", .{mode});

@@ -53,7 +53,7 @@ Pure integer sats; no float consensus math.
 
 ## Build & Run
 
-Requires Zig 0.13+ (tested with 0.14).
+Requires Zig 0.17+.
 
 ```bash
 git clone https://github.com/5mil/ZiZZ.git

@@ -23,22 +23,10 @@ pub const RpcServer = struct {
     }
 
     pub fn start(self: *RpcServer) !void {
-        const address = try std.net.Address.parseIp("127.0.0.1", self.port);
-        var server = try address.listen(.{ .reuse_address = true });
-        defer server.deinit();
-
-        std.debug.print("ZiZZ RPC listening on 127.0.0.1:{d} (user={s})\n", .{ self.port, self.user });
-        std.debug.print("Point tpool EXTERNAL at: http://{s}:{s}@127.0.0.1:{d}\n", .{ self.user, self.password, self.port });
-
-        while (true) {
-            const conn = server.accept() catch |err| {
-                std.debug.print("accept error: {}\n", .{err});
-                continue;
-            };
-            self.handleConnection(conn) catch |err| {
-                std.debug.print("handle error: {}\n", .{err});
-            };
-        }
+        _ = self;
+        std.debug.print("ZiZZ RPC temporarily disabled during Zig 0.17 port (std.net moved to std.Io).\n", .{});
+        std.debug.print("CLI commands (info, subsidy, genesis, hash) work. Node RPC will return.\n", .{});
+        return;
     }
 
     fn handleConnection(self: *RpcServer, conn: std.net.Server.Connection) !void {
@@ -163,7 +151,7 @@ pub const RpcServer = struct {
         const hashes = try self.chain.generateToAddress(n, addr);
         defer self.allocator.free(hashes);
 
-        var list = std.ArrayList(u8).init(self.allocator);
+        var list = std.array_list.Managed(u8).init(self.allocator);
         try list.appendSlice("[");
         for (hashes, 0..) |h, i| {
             if (i > 0) try list.appendSlice(",");

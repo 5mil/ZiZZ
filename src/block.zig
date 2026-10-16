@@ -5,8 +5,8 @@ const consensus = @import("consensus.zig");
 /// Minimal Bitcoin-style block header (80 bytes).
 pub const BlockHeader = struct {
     version: i32 = 1,
-    prev_block: [32]u8 = [_]u8{0} ** 32,
-    merkle_root: [32]u8 = [_]u8{0} ** 32,
+    prev_block: [32]u8 = std.mem.zeroes([32]u8),
+    merkle_root: [32]u8 = std.mem.zeroes([32]u8),
     timestamp: u32 = 0,
     bits: u32 = 0x207fffff, // easy difficulty for testnet/regtest
     nonce: u32 = 0,

@@ -16,11 +16,7 @@ pub fn sha256d(data: []const u8) [32]u8 {
 
 /// Convert 32-byte hash to lowercase hex string (64 chars).
 pub fn hashToHex(hash: [32]u8) [64]u8 {
-    var hex: [64]u8 = undefined;
-    const slice = std.fmt.fmtSliceHexLower(&hash);
-    // Manual or use bufPrint properly
-    _ = std.fmt.bufPrint(&hex, "{s}", .{slice}) catch unreachable;
-    return hex;
+    return std.fmt.bytesToHex(&hash, .lower);
 }
 
 test "sha256d empty" {

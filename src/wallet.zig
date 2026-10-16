@@ -10,7 +10,7 @@ pub const PrivateKey = struct {
         var key: [32]u8 = undefined;
         crypto.random.bytes(&key);
         // Ensure non-zero
-        if (std.mem.eql(u8, &key, &[_]u8{0} ** 32)) key[0] = 1;
+        if (std.mem.eql(u8, &key, &std.mem.zeroes([32]u8))) key[0] = 1;
         return .{ .bytes = key };
     }
 
@@ -84,5 +84,5 @@ pub fn addressFromPubkey(allocator: std.mem.Allocator, pubkey: [33]u8) ![]u8 {
     sha.update(&pubkey);
     var h: [32]u8 = undefined;
     sha.final(&h);
-    return try std.fmt.allocPrint(allocator, "zizz1{x}", .{std.fmt.fmtSliceHexLower(h[0..20])});
+    return try std.fmt.allocPrint(allocator, "zizz1{x}", .{std.fmt.bytesToHex(h[0..20], .lower)});
 }
