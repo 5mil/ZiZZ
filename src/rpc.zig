@@ -6,15 +6,17 @@ const hashmod = @import("hash.zig");
 pub const RpcServer = struct {
     allocator: std.mem.Allocator,
     chain: *chainmod.Chain,
+    io: std.Io,
     port: u16,
     user: []const u8,
     password: []const u8,
     chain_name: []const u8,
 
-    pub fn init(allocator: std.mem.Allocator, chain: *chainmod.Chain, port: u16, chain_name: []const u8) RpcServer {
+    pub fn init(allocator: std.mem.Allocator, chain: *chainmod.Chain, port: u16, chain_name: []const u8, io: std.Io) RpcServer {
         return .{
             .allocator = allocator,
             .chain = chain,
+            .io = io,
             .port = port,
             .user = "zizz",
             .password = "wick-of-the-ancients",
@@ -23,10 +25,32 @@ pub const RpcServer = struct {
     }
 
     pub fn start(self: *RpcServer) !void {
-        _ = self;
-        std.debug.print("ZiZZ RPC temporarily disabled during Zig 0.17 port (std.net moved to std.Io).\n", .{});
-        std.debug.print("CLI commands (info, subsidy, genesis, hash) work. Node RPC will return.\n", .{});
-        return;
+        const addr = try std.Io.net.IpAddress.parse("127.0.0.1", self.port);
+        var server = try addr.listen(self.io, .{ .reuse_address = true });
+        defer server.deinit(self.io);
+        std.debug.print("ZiZZ RPC listening on 127.0.0.1:{d} (user={s})\n", .{ self.port, self.user });
+        std.debug.print("Point tpool EXTERNAL at: http://{s}:{s}@127.0.0.1:{d}\n", .{ self.user, self.password, self.port });
+        while (true) {
+            var stream = server.accept(self.io) catch |err| {
+                std.debug.print("accept error: {}\n", .{err});
+                continue;
+            };
+            defer stream.close(self.io);
+            var rbuf: [8192]u8 = undefined;
+            var reader = stream.reader(self.io, &rbuf);
+            const n = reader.interface.readSliceShort(&rbuf) catch 0;
+            if (n == 0) continue;
+            const body = rbuf[0..n];
+            const resp = self.dispatch(body) catch |err| {
+                std.debug.print("dispatch error: {}\n", .{err});
+                continue;
+            };
+            defer self.allocator.free(resp);
+            var wbuf: [8192]u8 = undefined;
+            var writer = stream.writer(self.io, &wbuf);
+            writer.interface.writeAll(resp) catch {};
+            writer.interface.flush() catch {};
+        }
     }
 
     fn handleConnection(self: *RpcServer, conn: std.net.Server.Connection) !void {
@@ -188,7 +212,7 @@ pub const RpcServer = struct {
         const subsidy = consensus.getBlockSubsidy(height);
         return try std.fmt.allocPrint(self.allocator,
             \\{{"jsonrpc":"2.0","result":{{"version":1,"previousblockhash":"{s}","transactions":[],"coinbasevalue":{d},"target":"7fffff0000000000000000000000000000000000000000000000000000000000","mintime":0,"curtime":{d},"bits":"207fffff","height":{d},"noncerange":"00000000ffffffff","sigoplimit":80000,"sizelimit":4000000}},"id":1}}
-        , .{ &prev, subsidy, @as(u32, @intCast(std.time.timestamp())), height });
+        , .{ &prev, subsidy, @as(u32, @intCast(@divTrunc(std.Io.Clock.real.now(self.io).nanoseconds, std.time.ns_per_s))), height });
     }
 
     fn rpcSendToAddress(self: *RpcServer, body: []const u8) ![]const u8 {

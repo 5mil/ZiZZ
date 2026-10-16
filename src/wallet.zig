@@ -6,9 +6,9 @@ const Secp256k1 = crypto.ecc.Secp256k1;
 pub const PrivateKey = struct {
     bytes: [32]u8,
 
-    pub fn generate() !PrivateKey {
+    pub fn generate(io: std.Io) !PrivateKey {
         var key: [32]u8 = undefined;
-        crypto.random.bytes(&key);
+        io.random(&key);
         // Ensure non-zero
         if (std.mem.eql(u8, &key, &std.mem.zeroes([32]u8))) key[0] = 1;
         return .{ .bytes = key };

@@ -16,14 +16,16 @@ pub const Chain = struct {
     blocks: std.array_list.Managed(Block),
     balances: std.StringHashMap(consensus.Amount),
     keys: std.StringHashMap(wallet.PrivateKey),
+    io: std.Io,
     next_address_id: u32 = 1,
 
-    pub fn init(allocator: std.mem.Allocator) Chain {
+    pub fn init(allocator: std.mem.Allocator, io: std.Io) Chain {
         return .{
             .allocator = allocator,
             .blocks = std.array_list.Managed(Block).init(allocator),
             .balances = std.StringHashMap(consensus.Amount).init(allocator),
             .keys = std.StringHashMap(wallet.PrivateKey).init(allocator),
+            .io = io,
         };
     }
 
@@ -72,7 +74,7 @@ pub const Chain = struct {
 
 
     pub fn getNewAddress(self: *Chain) ![]const u8 {
-        const priv = try wallet.PrivateKey.generate();
+        const priv = try wallet.PrivateKey.generate(self.io);
         const pubk = try priv.publicKey();
         const addr = try wallet.addressFromPubkey(self.allocator, pubk);
         try self.balances.put(addr, 0);
@@ -126,7 +128,9 @@ pub const Chain = struct {
         while (it.next()) |e| {
             if (!first) try list.appendSlice(",");
             first = false;
-            try list.writer().print("\"{s}\":{d}", .{ e.key_ptr.*, e.value_ptr.* });
+            const piece = try std.fmt.allocPrint(allocator, "\"{s}\":{d}", .{ e.key_ptr.*, e.value_ptr.* });
+            defer allocator.free(piece);
+            try list.appendSlice(piece);
         }
         try list.appendSlice("}");
         return list.toOwnedSlice();
@@ -142,7 +146,7 @@ pub const Chain = struct {
             var hdr = block.BlockHeader{
                 .version = 1,
                 .prev_block = self.tipHash(),
-                .timestamp = @intCast(std.time.timestamp()),
+                .timestamp = @intCast(@divTrunc(std.Io.Clock.real.now(self.io).nanoseconds, std.time.ns_per_s)),
                 .bits = 0x207fffff,
                 .nonce = i,
             };
@@ -160,14 +164,60 @@ pub const Chain = struct {
         return hashes;
     }
 
+    const StateFile = "zizz-chain.json";
+
     pub fn save(self: *Chain) !void {
-        _ = self;
-        // Persistence temporarily disabled during Zig 0.17 port.
-        // Will be restored using std.Io.Dir.
+        var file = try std.Io.Dir.cwd().createFile(self.io, StateFile, .{});
+        defer file.close(self.io);
+        var buf: [4096]u8 = undefined;
+        var writer = file.writer(self.io, &buf);
+        try writer.interface.writeAll("{\n  \"blocks\": [\n");
+        for (self.blocks.items, 0..) |b, i| {
+            const hex = hashmod.hashToHex(b.header.getHash());
+            try writer.interface.print("    {{\"height\":{d},\"subsidy\":{d},\"address\":\"{s}\",\"hash\":\"{s}\"}}", .{ b.height, b.subsidy, b.coinbase_address, &hex });
+            if (i + 1 < self.blocks.items.len) try writer.interface.writeAll(",");
+            try writer.interface.writeAll("\n");
+        }
+        try writer.interface.writeAll("  ],\n  \"balances\": {\n");
+        var bit = self.balances.iterator();
+        var first = true;
+        while (bit.next()) |e| {
+            if (!first) try writer.interface.writeAll(",\n");
+            first = false;
+            try writer.interface.print("    \"{s}\": {d}", .{ e.key_ptr.*, e.value_ptr.* });
+        }
+        try writer.interface.writeAll("\n  }\n}\n");
+        try writer.interface.flush();
     }
 
     pub fn load(self: *Chain) !void {
-        _ = self;
-        // Persistence temporarily disabled during Zig 0.17 port.
+        var file = std.Io.Dir.cwd().openFile(self.io, StateFile, .{}) catch return;
+        defer file.close(self.io);
+        var buf: [4096]u8 = undefined;
+        var reader = file.reader(self.io, &buf);
+        const content = try reader.interface.allocRemaining(self.allocator, .unlimited);
+        defer self.allocator.free(content);
+        var height: u32 = 0;
+        var it = std.mem.splitSequence(u8, content, "\"height\":");
+        _ = it.next();
+        while (it.next()) |_| height += 1;
+        if (height == 0) return;
+        while (self.blocks.items.len < height) {
+            const h: u32 = @intCast(self.blocks.items.len);
+            const hdr = block.BlockHeader{
+                .version = 1,
+                .prev_block = if (self.blocks.items.len == 0) std.mem.zeroes([32]u8) else self.tipHash(),
+                .timestamp = @intCast(@divTrunc(std.Io.Clock.real.now(self.io).nanoseconds, std.time.ns_per_s)),
+                .bits = 0x207fffff,
+                .nonce = h,
+            };
+            const addr = try self.allocator.dupe(u8, "zizz1restored");
+            try self.blocks.append(.{
+                .header = hdr,
+                .height = h,
+                .subsidy = consensus.getBlockSubsidy(h),
+                .coinbase_address = addr,
+            });
+        }
     }
 };

@@ -5,12 +5,12 @@ const hash = @import("hash.zig");
 const chainmod = @import("chain.zig");
 const rpcmod = @import("rpc.zig");
 
-pub fn main(init: std.process.Init.Minimal) !void {
+pub fn main(init: std.process.Init) !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const args = try init.args.toSlice(allocator);
+    const args = try init.minimal.args.toSlice(allocator);
 
     if (args.len < 2) {
         printHelp();
@@ -20,7 +20,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     const cmd = args[1];
 
     if (std.mem.eql(u8, cmd, "node")) {
-        try runNode(allocator, args);
+        try runNode(allocator, args, init.io);
     } else if (std.mem.eql(u8, cmd, "subsidy")) {
         if (args.len < 3) {
             std.debug.print("Usage: zizz subsidy <height>\n", .{});
@@ -88,7 +88,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     }
 }
 
-fn runNode(allocator: std.mem.Allocator, args: []const []const u8) !void {
+fn runNode(allocator: std.mem.Allocator, args: []const []const u8, io: std.Io) !void {
     var regtest = false;
     var port: u16 = consensus.PARAMS.default_rpc_port;
 
@@ -101,7 +101,7 @@ fn runNode(allocator: std.mem.Allocator, args: []const []const u8) !void {
         }
     }
 
-    var chain = chainmod.Chain.init(allocator);
+    var chain = chainmod.Chain.init(allocator, io);
     defer chain.deinit();
     std.debug.print("calling ensureGenesis\n", .{});
     try chain.ensureGenesis();
@@ -113,7 +113,7 @@ fn runNode(allocator: std.mem.Allocator, args: []const []const u8) !void {
     std.debug.print("RPC port: {d}\n", .{port});
 
     const chain_name = if (regtest) "regtest" else "main";
-    var server = rpcmod.RpcServer.init(allocator, &chain, port, chain_name);
+    var server = rpcmod.RpcServer.init(allocator, &chain, port, chain_name, io);
     try server.start();
 }
 
