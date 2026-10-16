@@ -59,6 +59,15 @@ Requires Zig 0.17+.
 git clone https://github.com/5mil/ZiZZ.git
 cd ZiZZ
 zig build
+
+## GUI Wallet
+
+```bash
+zig build wallet          # Linux/macOS
+./zig-out/bin/zizz-wallet
+```
+
+Windows binary: `releases/zizz-wallet-windows-x86_64.exe` (dvui + SDL3)
 ./zig-out/bin/zizz --help
 ```
 
