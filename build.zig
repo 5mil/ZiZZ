@@ -36,6 +36,9 @@ pub fn build(b: *std.Build) void {
         .name = "zizz-wallet",
         .root_module = gui_mod,
     });
+    if (target.result.os.tag == .windows) {
+        gui.subsystem = .windows;
+    }
     b.installArtifact(gui);
 
     const run_gui = b.addRunArtifact(gui);
