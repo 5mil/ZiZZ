@@ -3,7 +3,12 @@
     .version = "0.1.0",
     .fingerprint = 0x7c066154b821a40,
     .minimum_zig_version = "0.17.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .dvui = .{
+            .url = "git+https://github.com/david-vanderson/dvui?ref=main#bed60d8693f510508a70675fb53d4c248fa16cac",
+            .hash = "dvui-0.6.0-dev-AQFJmbU4BAEhlnv12_C6RoFnnu4GDDe2O7ZRX2jaC1dG",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

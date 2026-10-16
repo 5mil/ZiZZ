@@ -4,30 +4,41 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mod = b.createModule(.{
+    // CLI / node
+    const cli_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    const exe = b.addExecutable(.{
+    const cli = b.addExecutable(.{
         .name = "zizz",
-        .root_module = mod,
+        .root_module = cli_mod,
+    });
+    b.installArtifact(cli);
+
+    // GUI wallet
+    const dvui_dep = b.dependency("dvui", .{
+        .target = target,
+        .optimize = optimize,
+        .backend = .sdl3,
     });
 
-    b.installArtifact(exe);
-
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    const run_step = b.step("run", "Run the ZiZZ node/CLI");
-    run_step.dependOn(&run_cmd.step);
-
-    const unit_tests = b.addTest(.{
-        .root_module = mod,
+    const gui_mod = b.createModule(.{
+        .root_source_file = b.path("src/wallet_gui.zig"),
+        .target = target,
+        .optimize = optimize,
     });
+    gui_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+    gui_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
 
-    const run_unit_tests = b.addRunArtifact(unit_tests);
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
+    const gui = b.addExecutable(.{
+        .name = "zizz-wallet",
+        .root_module = gui_mod,
+    });
+    b.installArtifact(gui);
+
+    const run_gui = b.addRunArtifact(gui);
+    const gui_step = b.step("wallet", "Run the ZiZZ GUI wallet");
+    gui_step.dependOn(&run_gui.step);
 }
