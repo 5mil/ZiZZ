@@ -344,9 +344,29 @@ fn receiveTab(chain: *chainmod.Chain) !void {
 }
 
 fn transactionsTab(chain: *chainmod.Chain) !void {
-    _ = chain;
     dvui.label(@src(), "Transactions", .{}, .{ .font = .{ .size = 16 } });
-    dvui.label(@src(), "Transaction history will appear here.", .{}, .{});
+    if (chain.blocks.items.len == 0) {
+        dvui.label(@src(), "No transactions yet.", .{}, .{ .margin = .{ .x = 0, .y = 8 } });
+        return;
+    }
+    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
+    defer scroll.deinit();
+    var i: usize = chain.blocks.items.len;
+    while (i > 0) {
+        i -= 1;
+        const b = chain.blocks.items[i];
+        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 }, .padding = .{ .x = 8, .y = 6 }, .background = true });
+        defer row.deinit();
+        var hbuf: [16]u8 = undefined;
+        const hs = std.fmt.bufPrint(&hbuf, "#{d}", .{b.height}) catch "#";
+        dvui.labelNoFmt(@src(), hs, .{}, .{ .min_size_content = .{ .w = 50 } });
+        var abuf: [24]u8 = undefined;
+        const short = if (b.coinbase_address.len > 16) b.coinbase_address[0..16] else b.coinbase_address;
+        const as = std.fmt.bufPrint(&abuf, "{s}...", .{short}) catch short;
+        dvui.labelNoFmt(@src(), as, .{}, .{ .expand = .horizontal });
+        var sbuf: [40]u8 = undefined;
+        dvui.labelNoFmt(@src(), fmtAmount(&sbuf, b.subsidy), .{}, .{});
+    }
 }
 
 fn addressesTab(chain: *chainmod.Chain) !void {
