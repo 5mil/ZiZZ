@@ -112,6 +112,43 @@ fn walletFrame(chain: *chainmod.Chain) !void {
     var root = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
     defer root.deinit();
 
+
+    // Menu bar
+    {
+        var m = dvui.menu(@src(), .horizontal, .{});
+        defer m.deinit();
+        if (dvui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{})) |r| {
+            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+            defer fw.deinit();
+            if (dvui.menuItemLabel(@src(), "Generate Block", .{}, .{}) != null) {
+                const addr = chain.getNewAddress() catch return;
+                _ = chain.generateToAddress(1, addr) catch return;
+                setStatus("Mined 1 block");
+                m.close();
+            }
+        }
+        if (dvui.menuItemLabel(@src(), "Settings", .{ .submenu = true }, .{})) |r| {
+            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+            defer fw.deinit();
+            if (dvui.menuItemLabel(@src(), if (display_zizz) "Display: sats" else "Display: ZiZZ", .{}, .{}) != null) {
+                display_zizz = !display_zizz;
+                m.close();
+            }
+            if (dvui.menuItemLabel(@src(), if (show_console) "Hide Console" else "Show Console", .{}, .{}) != null) {
+                show_console = !show_console;
+                m.close();
+            }
+        }
+        if (dvui.menuItemLabel(@src(), "Help", .{ .submenu = true }, .{})) |r| {
+            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+            defer fw.deinit();
+            if (dvui.menuItemLabel(@src(), "About", .{}, .{}) != null) {
+                setStatus("ZiZZ wallet");
+                m.close();
+            }
+        }
+    }
+
     // Tab bar + node status
     {
         var tabs = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 8, .y = 4 } });
