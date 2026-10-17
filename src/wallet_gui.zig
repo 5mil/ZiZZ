@@ -263,10 +263,24 @@ fn receiveTab(chain: *chainmod.Chain) !void {
         const addr = chain.getNewAddress() catch return;
         setStatus(addr);
     }
-    dvui.label(@src(), "Your addresses:", .{}, .{ .margin = .{ .x = 0, .y = 8 } });
+    dvui.label(@src(), "Your addresses", .{}, .{ .margin = .{ .x = 0, .y = 8 } });
+    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
+    defer scroll.deinit();
     var it = chain.balances.iterator();
+    var idx: usize = 1;
     while (it.next()) |e| {
-        dvui.labelNoFmt(@src(), e.key_ptr.*, .{}, .{});
+        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 }, .padding = .{ .x = 8, .y = 6 }, .background = true });
+        defer row.deinit();
+        var nbuf: [16]u8 = undefined;
+        const ns = std.fmt.bufPrint(&nbuf, "#{d}", .{idx}) catch "#";
+        dvui.labelNoFmt(@src(), ns, .{}, .{ .min_size_content = .{ .w = 40 } });
+        var abuf: [24]u8 = undefined;
+        const short = if (e.key_ptr.*.len > 18) e.key_ptr.*[0..18] else e.key_ptr.*;
+        const as = std.fmt.bufPrint(&abuf, "{s}...", .{short}) catch short;
+        dvui.labelNoFmt(@src(), as, .{}, .{ .expand = .horizontal });
+        var bbuf: [40]u8 = undefined;
+        dvui.labelNoFmt(@src(), fmtAmount(&bbuf, e.value_ptr.*), .{}, .{});
+        idx += 1;
     }
 }
 
@@ -281,11 +295,19 @@ fn addressesTab(chain: *chainmod.Chain) !void {
     var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
     defer scroll.deinit();
     var it = chain.balances.iterator();
+    var idx: usize = 1;
     while (it.next()) |e| {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 }, .padding = .{ .x = 8, .y = 4 }, .background = true });
+        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 }, .padding = .{ .x = 8, .y = 6 }, .background = true });
         defer row.deinit();
-        dvui.labelNoFmt(@src(), e.key_ptr.*, .{}, .{ .expand = .horizontal });
-        var ab: [40]u8 = undefined;
-        dvui.labelNoFmt(@src(), fmtAmount(&ab, e.value_ptr.*), .{}, .{});
+        var nbuf: [16]u8 = undefined;
+        const ns = std.fmt.bufPrint(&nbuf, "#{d}", .{idx}) catch "#";
+        dvui.labelNoFmt(@src(), ns, .{}, .{ .min_size_content = .{ .w = 40 } });
+        var abuf: [24]u8 = undefined;
+        const short = if (e.key_ptr.*.len > 18) e.key_ptr.*[0..18] else e.key_ptr.*;
+        const as = std.fmt.bufPrint(&abuf, "{s}...", .{short}) catch short;
+        dvui.labelNoFmt(@src(), as, .{}, .{ .expand = .horizontal });
+        var bbuf: [40]u8 = undefined;
+        dvui.labelNoFmt(@src(), fmtAmount(&bbuf, e.value_ptr.*), .{}, .{});
+        idx += 1;
     }
 }
