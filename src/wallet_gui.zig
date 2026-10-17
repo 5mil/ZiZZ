@@ -6,7 +6,7 @@ const chainmod = @import("chain.zig");
 const explorer = @import("explorer.zig");
 const logo_bytes = @embedFile("assets/zizz-logo.jpg");
 
-const Tab = enum { overview, send, receive, transactions, addresses };
+const Tab = enum { overview, send, receive, transactions, addresses, mining };
 
 var status_buf: [160]u8 = undefined;
 var status_len: usize = 0;
@@ -20,6 +20,10 @@ var log_count: usize = 0;
 
 var splash_frames: u32 = 180; // ~1.5s at 60fps
 var node_connected: bool = true;
+var mine_count: [8]u8 = "1".* ++ [_]u8{0}**6;
+var mine_count_len: usize = 1;
+var mining_on: bool = false;
+var mine_threads: u8 = 1;
 var console_input: [128]u8 = undefined;
 var console_input_len: usize = 0;
 var send_to: [128]u8 = undefined;
@@ -182,6 +186,7 @@ fn walletFrame(chain: *chainmod.Chain) !void {
         if (dvui.button(@src(), "Receive", .{}, .{})) current_tab = .receive;
         if (dvui.button(@src(), "Transactions", .{}, .{})) current_tab = .transactions;
         if (dvui.button(@src(), "Address Book", .{}, .{})) current_tab = .addresses;
+        if (dvui.button(@src(), "Mining", .{}, .{})) current_tab = .mining;
 
         var sp = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         sp.deinit();
@@ -204,6 +209,7 @@ fn walletFrame(chain: *chainmod.Chain) !void {
         .receive => try receiveTab(chain),
         .transactions => try transactionsTab(chain),
         .addresses => try addressesTab(chain),
+        .mining => try miningTab(chain),
     }
 
     // Console
@@ -291,6 +297,53 @@ fn handleConsole(chain: *chainmod.Chain, cmd: []const u8) void {
         // ignore
     } else {
         log("unknown command");
+    }
+}
+
+
+fn miningTab(chain: *chainmod.Chain) !void {
+    var box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .horizontal, .margin = .{ .x = 8, .y = 8 } });
+    defer box.deinit();
+    dvui.label(@src(), "Mining", .{}, .{ .font = .{ .size = 16 } });
+
+    dvui.label(@src(), "Blocks to mine", .{}, .{ .margin = .{ .x = 0, .y = 8 } });
+    var entry = dvui.textEntry(@src(), .{
+        .text = .{ .internal = .{ .limit = 8 } },
+        .placeholder = "1",
+    }, .{ .min_size_content = .{ .w = 80 } });
+    defer entry.deinit();
+
+    if (dvui.button(@src(), "Mine N", .{}, .{ .margin = .{ .x = 0, .y = 6 } })) {
+        const txt = entry.textGet();
+        const n = std.fmt.parseInt(u32, txt, 10) catch 1;
+        const addr = chain.getNewAddress() catch return;
+        _ = chain.generateToAddress(n, addr) catch return;
+        setStatus("Mined");
+    }
+
+    if (dvui.button(@src(), if (mining_on) "Stop Mining" else "Start Continuous", .{}, .{ .margin = .{ .x = 0, .y = 6 } })) {
+        mining_on = !mining_on;
+        if (mining_on) {
+            const addr = chain.getNewAddress() catch return;
+            _ = chain.generateToAddress(1, addr) catch {};
+            setStatus("Mining on");
+        } else {
+            setStatus("Mining off");
+        }
+    }
+
+    dvui.label(@src(), "Advanced", .{}, .{ .margin = .{ .x = 0, .y = 12 }, .font = .{ .size = 14 } });
+    var trow = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 4 } });
+    defer trow.deinit();
+    dvui.label(@src(), "Threads:", .{}, .{});
+    if (dvui.button(@src(), "-", .{}, .{})) {
+        if (mine_threads > 1) mine_threads -= 1;
+    }
+    var tbuf: [8]u8 = undefined;
+    const ts = std.fmt.bufPrint(&tbuf, "{d}", .{mine_threads}) catch "1";
+    dvui.labelNoFmt(@src(), ts, .{}, .{ .margin = .{ .x = 8, .y = 0 } });
+    if (dvui.button(@src(), "+", .{}, .{})) {
+        if (mine_threads < 8) mine_threads += 1;
     }
 }
 
