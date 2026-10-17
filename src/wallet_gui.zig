@@ -19,6 +19,8 @@ var log_count: usize = 0;
 
 var splash_frames: u32 = 180; // ~1.5s at 60fps
 var node_connected: bool = true;
+var console_input: [128]u8 = undefined;
+var console_input_len: usize = 0;
 var send_to: [128]u8 = undefined;
 var send_to_len: usize = 0;
 var send_amt: [32]u8 = undefined;
@@ -144,6 +146,17 @@ fn walletFrame(chain: *chainmod.Chain) !void {
                 show_console = !show_console;
                 m.close();
             }
+            if (dvui.menuItemLabel(@src(), "New Address", .{}, .{}) != null) {
+                const addr = chain.getNewAddress() catch return;
+                setStatus(addr);
+                m.close();
+            }
+            if (dvui.menuItemLabel(@src(), "Mine 1", .{}, .{}) != null) {
+                const addr = chain.getNewAddress() catch return;
+                _ = chain.generateToAddress(1, addr) catch return;
+                setStatus("Mined");
+                m.close();
+            }
         }
         if (dvui.menuItemLabel(@src(), "Help", .{ .submenu = true }, .{})) |r| {
             var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
@@ -190,12 +203,25 @@ fn walletFrame(chain: *chainmod.Chain) !void {
 
     // Console
     if (show_console) {
-        dvui.label(@src(), "Console", .{}, .{ .margin = .{ .x = 12, .y = 4 } });
-        var cscroll = dvui.scrollArea(@src(), .{}, .{ .expand = .horizontal, .min_size_content = .{ .h = 100 }, .margin = .{ .x = 12, .y = 0 } });
+        var cbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .horizontal, .margin = .{ .x = 12, .y = 4 }, .min_size_content = .{ .h = 140 } });
+        defer cbox.deinit();
+        dvui.label(@src(), "Console", .{}, .{});
+        var cscroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
         defer cscroll.deinit();
         var i: usize = 0;
         while (i < log_count) : (i += 1) {
             dvui.labelNoFmt(@src(), log_lines[i][0..log_lens[i]], .{}, .{});
+        }
+        var inrow = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 } });
+        defer inrow.deinit();
+        var entry = dvui.textEntry(@src(), .{
+            .text = .{ .internal = .{ .limit = 120 } },
+            .placeholder = "help, getbalance, getnewaddress, generate...",
+        }, .{ .expand = .horizontal });
+        defer entry.deinit();
+        if (dvui.button(@src(), "Run", .{}, .{})) {
+            const cmd = entry.textGet();
+            handleConsole(chain, cmd);
         }
     }
 
@@ -210,6 +236,39 @@ fn walletFrame(chain: *chainmod.Chain) !void {
             const hs = std.fmt.bufPrint(&hb, "Height {d}", .{chain.tipHeight()}) catch "Ready";
             dvui.labelNoFmt(@src(), hs, .{}, .{});
         }
+    }
+}
+
+
+fn handleConsole(chain: *chainmod.Chain, cmd: []const u8) void {
+    log(cmd);
+    if (std.mem.eql(u8, cmd, "help")) {
+        log("commands: help, getbalance, getnewaddress, generate, getblockcount");
+    } else if (std.mem.eql(u8, cmd, "getbalance")) {
+        var buf: [48]u8 = undefined;
+        const s = fmtAmount(&buf, chain.getTotalBalance());
+        log(s);
+    } else if (std.mem.eql(u8, cmd, "getnewaddress")) {
+        const addr = chain.getNewAddress() catch {
+            log("error");
+            return;
+        };
+        log(addr);
+    } else if (std.mem.eql(u8, cmd, "generate")) {
+        const addr = chain.getNewAddress() catch return;
+        _ = chain.generateToAddress(1, addr) catch {
+            log("mine failed");
+            return;
+        };
+        log("mined 1");
+    } else if (std.mem.eql(u8, cmd, "getblockcount")) {
+        var buf: [16]u8 = undefined;
+        const s = std.fmt.bufPrint(&buf, "{d}", .{chain.tipHeight()}) catch "0";
+        log(s);
+    } else if (cmd.len == 0) {
+        // ignore
+    } else {
+        log("unknown command");
     }
 }
 
