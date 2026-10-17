@@ -3,6 +3,7 @@ const dvui = @import("dvui");
 const SDLBackend = @import("sdl-backend");
 
 const chainmod = @import("chain.zig");
+const explorer = @import("explorer.zig");
 const logo_bytes = @embedFile("assets/zizz-logo.jpg");
 
 const Tab = enum { overview, send, receive, transactions, addresses };
@@ -44,6 +45,7 @@ pub fn main(init: std.process.Init) !void {
     var chain = chainmod.Chain.init(init.gpa, init.io);
     defer chain.deinit();
     try chain.ensureGenesis();
+    explorer.start(&chain, init.io, init.gpa);
     log("ZiZZ wallet started");
 
     var interrupted = true;
