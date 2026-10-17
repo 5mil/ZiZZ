@@ -44,4 +44,21 @@ pub fn build(b: *std.Build) void {
     const run_gui = b.addRunArtifact(gui);
     const gui_step = b.step("wallet", "Run the ZiZZ GUI wallet");
     gui_step.dependOn(&run_gui.step);
+    // Webview wallet
+    const webui_dep = b.dependency("zig_webui", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const web_mod = b.createModule(.{
+        .root_source_file = b.path("src/wallet_web.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    web_mod.addImport("webui", webui_dep.module("webui"));
+    const web = b.addExecutable(.{
+        .name = "zizz-web",
+        .root_module = web_mod,
+    });
+    b.installArtifact(web);
+
 }

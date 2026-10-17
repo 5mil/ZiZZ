@@ -8,6 +8,10 @@
             .url = "git+https://github.com/david-vanderson/dvui?ref=main#bed60d8693f510508a70675fb53d4c248fa16cac",
             .hash = "dvui-0.6.0-dev-AQFJmbU4BAEhlnv12_C6RoFnnu4GDDe2O7ZRX2jaC1dG",
         },
+        .zig_webui = .{
+            .url = "https://github.com/webui-dev/zig-webui/archive/main.tar.gz",
+            .hash = "zig_webui-2.5.1-M4z7zWPVAQA4GRBq-uS_aPAoxjFsR0hbpszpshwGX1Tf",
+        },
     },
     .paths = .{
         "build.zig",
