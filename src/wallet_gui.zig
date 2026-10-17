@@ -18,6 +18,10 @@ var log_count: usize = 0;
 
 var splash_frames: u32 = 180; // ~1.5s at 60fps
 var node_connected: bool = true;
+var send_to: [128]u8 = undefined;
+var send_to_len: usize = 0;
+var send_amt: [32]u8 = undefined;
+var send_amt_len: usize = 0;
 
 
 pub fn main(init: std.process.Init) !void {
@@ -252,9 +256,57 @@ fn overviewTab(chain: *chainmod.Chain) !void {
 }
 
 fn sendTab(chain: *chainmod.Chain) !void {
-    _ = chain;
     dvui.label(@src(), "Send", .{}, .{ .font = .{ .size = 16 } });
-    dvui.label(@src(), "Send form coming next.", .{}, .{});
+
+    dvui.label(@src(), "To address", .{}, .{ .margin = .{ .x = 0, .y = 6 } });
+    var to_entry = dvui.textEntry(@src(), .{
+        .text = .{ .buffer = send_to[0..send_to_len] },
+        .placeholder = "zizz1...",
+    }, .{ .expand = .horizontal });
+    defer to_entry.deinit();
+    send_to_len = to_entry.len;
+
+    dvui.label(@src(), "Amount", .{}, .{ .margin = .{ .x = 0, .y = 6 } });
+    var amt_entry = dvui.textEntry(@src(), .{
+        .text = .{ .buffer = send_amt[0..send_amt_len] },
+        .placeholder = "0.0",
+    }, .{ .min_size_content = .{ .w = 160 } });
+    defer amt_entry.deinit();
+    send_amt_len = amt_entry.len;
+
+    if (dvui.button(@src(), "Send", .{}, .{ .margin = .{ .x = 0, .y = 10 } })) {
+        const to = send_to[0..send_to_len];
+        const amt_str = send_amt[0..send_amt_len];
+        if (to.len == 0 or amt_str.len == 0) {
+            setStatus("Enter address and amount");
+            return;
+        }
+        const amt_f = std.fmt.parseFloat(f64, amt_str) catch {
+            setStatus("Invalid amount");
+            return;
+        };
+        const sats: i64 = @intFromFloat(amt_f * 100_000_000.0);
+        // find a from address with enough
+        var from: ?[]const u8 = null;
+        var it = chain.balances.iterator();
+        while (it.next()) |e| {
+            if (e.value_ptr.* >= sats) {
+                from = e.key_ptr.*;
+                break;
+            }
+        }
+        if (from) |f| {
+            chain.sendToAddress(f, to, sats) catch |err| {
+                setStatus(@errorName(err));
+                return;
+            };
+            setStatus("Sent");
+            send_to_len = 0;
+            send_amt_len = 0;
+        } else {
+            setStatus("No address has enough");
+        }
+    }
 }
 
 fn receiveTab(chain: *chainmod.Chain) !void {
