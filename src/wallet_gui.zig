@@ -261,31 +261,25 @@ fn sendTab(chain: *chainmod.Chain) !void {
     var form = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .horizontal, .margin = .{ .x = 8, .y = 8 } });
     defer form.deinit();
 
-    dvui.label(@src(), "Send", .{}, .{ .font = .{ .size = 16 }, .margin = .{ .x = 0, .y = 4 } });
+    dvui.label(@src(), "Send", .{}, .{ .font = .{ .size = 16 } });
 
     dvui.label(@src(), "To address", .{}, .{ .margin = .{ .x = 0, .y = 8 } });
-    var to_box = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 } });
     var to_entry = dvui.textEntry(@src(), .{
-        .text = .{ .buffer = send_to[0..send_to_len] },
+        .text = .{ .internal = .{ .limit = 128 } },
         .placeholder = "zizz1...",
-    }, .{ .expand = .horizontal, .min_size_content = .{ .h = 28 } });
+    }, .{ .expand = .horizontal });
     defer to_entry.deinit();
-    send_to_len = to_entry.len;
-    to_box.deinit();
 
-    dvui.label(@src(), "Amount", .{}, .{ .margin = .{ .x = 0, .y = 10 } });
-    var amt_box = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 } });
+    dvui.label(@src(), "Amount", .{}, .{ .margin = .{ .x = 0, .y = 8 } });
     var amt_entry = dvui.textEntry(@src(), .{
-        .text = .{ .buffer = send_amt[0..send_amt_len] },
+        .text = .{ .internal = .{ .limit = 32 } },
         .placeholder = "0.0",
-    }, .{ .min_size_content = .{ .w = 180, .h = 28 } });
+    }, .{ .min_size_content = .{ .w = 160 } });
     defer amt_entry.deinit();
-    send_amt_len = amt_entry.len;
-    amt_box.deinit();
 
-    if (dvui.button(@src(), "Send", .{}, .{ .margin = .{ .x = 0, .y = 14 } })) {
-        const to = send_to[0..send_to_len];
-        const amt_str = send_amt[0..send_amt_len];
+    if (dvui.button(@src(), "Send", .{}, .{ .margin = .{ .x = 0, .y = 10 } })) {
+        const to = to_entry.textGet();
+        const amt_str = amt_entry.textGet();
         if (to.len == 0 or amt_str.len == 0) {
             setStatus("Enter address and amount");
             return;
@@ -310,8 +304,8 @@ fn sendTab(chain: *chainmod.Chain) !void {
                 return;
             };
             setStatus("Sent");
-            send_to_len = 0;
-            send_amt_len = 0;
+            
+            
         } else {
             setStatus("No address has enough");
         }
