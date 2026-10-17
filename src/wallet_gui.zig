@@ -7,6 +7,7 @@ const chainmod = @import("chain.zig");
 var status_buf: [160]u8 = undefined;
 var status_len: usize = 0;
 var show_console: bool = false;
+var display_zizz: bool = true;
 var log_lines: [32][120]u8 = undefined;
 var log_lens: [32]usize = std.mem.zeroes([32]usize);
 var log_count: usize = 0;
@@ -96,6 +97,14 @@ fn walletFrame(chain: *chainmod.Chain) !void {
                 setStatus("New address");
             }
         }
+        if (dvui.menuItemLabel(@src(), "Preferences", .{ .submenu = true }, .{})) |r| {
+            var fm = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+            defer fm.deinit();
+            if (dvui.menuItemLabel(@src(), if (display_zizz) "Show sats" else "Show ZiZZ", .{}, .{})) |_| {
+                display_zizz = !display_zizz;
+            }
+        }
+
         if (dvui.menuItemLabel(@src(), "Window", .{ .submenu = true }, .{})) |r| {
             var fm = dvui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fm.deinit();
@@ -133,7 +142,7 @@ fn walletFrame(chain: *chainmod.Chain) !void {
         defer card.deinit();
         dvui.label(@src(), "Balance", .{}, .{});
         var tb: [48]u8 = undefined;
-        const ts = std.fmt.bufPrint(&tb, "{d} sats", .{total}) catch "0";
+        const ts = if (display_zizz) std.fmt.bufPrint(&tb, "{d:.8} ZiZZ", .{@as(f64, @floatFromInt(total)) / 100_000_000.0}) catch "0" else std.fmt.bufPrint(&tb, "{d} sats", .{total}) catch "0";
         dvui.labelNoFmt(@src(), ts, .{}, .{ .font = .{ .size = 26 } });
     }
 
@@ -173,7 +182,7 @@ fn walletFrame(chain: *chainmod.Chain) !void {
             const as = std.fmt.bufPrint(&ab, "{s}", .{entry.key_ptr.*}) catch continue;
             dvui.labelNoFmt(@src(), as, .{}, .{ .expand = .horizontal });
             var bb: [40]u8 = undefined;
-            const bs = std.fmt.bufPrint(&bb, "{d}", .{entry.value_ptr.*}) catch continue;
+            const bs = if (display_zizz) std.fmt.bufPrint(&bb, "{d:.8}", .{@as(f64, @floatFromInt(entry.value_ptr.*)) / 100_000_000.0}) catch continue else std.fmt.bufPrint(&bb, "{d}", .{entry.value_ptr.*}) catch continue;
             dvui.labelNoFmt(@src(), bs, .{}, .{});
         }
     }
