@@ -3,6 +3,7 @@ const dvui = @import("dvui");
 const SDLBackend = @import("sdl-backend");
 
 const chainmod = @import("chain.zig");
+const logo_bytes = @embedFile("assets/zizz-logo.jpg");
 
 const Tab = enum { overview, send, receive, transactions, addresses };
 
@@ -15,7 +16,7 @@ var log_lines: [32][120]u8 = undefined;
 var log_lens: [32]usize = std.mem.zeroes([32]usize);
 var log_count: usize = 0;
 
-var splash_frames: u32 = 60; // ~1.5s at 60fps
+var splash_frames: u32 = 180; // ~1.5s at 60fps
 var node_connected: bool = true;
 
 
@@ -67,6 +68,7 @@ fn splashFrame() void {
     defer center.deinit();
 
     // Logo image
+    _ = dvui.image(@src(), .{ .source = .{ .imageFile = .{ .bytes = logo_bytes, .name = "zizz-logo" } } }, .{ .min_size_content = .{ .w = 480, .h = 320 } });
     
 
     dvui.label(@src(), "Loading wallet...", .{}, .{ .margin = .{ .x = 0, .y = 12 } });
