@@ -15,6 +15,11 @@ var log_lines: [32][120]u8 = undefined;
 var log_lens: [32]usize = std.mem.zeroes([32]usize);
 var log_count: usize = 0;
 
+var splash_frames: u32 = 90; // ~1.5s at 60fps
+var node_connected: bool = true;
+
+const logo_bytes = @embedFile("assets/zizz-logo.jpg");
+
 pub fn main(init: std.process.Init) !void {
     var backend = try SDLBackend.initWindow(.{
         .io = init.io,
@@ -41,11 +46,31 @@ pub fn main(init: std.process.Init) !void {
     while (window_open) {
         const nstime = win.beginWait(interrupted);
         try win.begin(nstime);
-        walletFrame(&chain) catch {};
+
+        if (splash_frames > 0) {
+            splashFrame();
+            splash_frames -= 1;
+        } else {
+            walletFrame(&chain) catch {};
+        }
+
         const end_micros = try win.end(.{});
         const wait_micros = win.waitTime(end_micros);
         interrupted = backend.waitEventTimeout(wait_micros) catch true;
     }
+}
+
+fn splashFrame() void {
+    var root = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = true, .color_fill = .{ .color = .{ .r = 10, .g = 12, .b = 20, .a = 255 } } });
+    defer root.deinit();
+
+    var center = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .gravity_y = 0.5 });
+    defer center.deinit();
+
+    // Logo image
+    _ = dvui.image(@src(), .{ .source = .{ .imageFile = .{ .bytes = logo_bytes, .name = "zizz-logo" } } }, .{ .min_size_content = .{ .w = 420, .h = 280 } });
+
+    dvui.label(@src(), "Loading wallet...", .{}, .{ .margin = .{ .x = 0, .y = 12 } });
 }
 
 fn log(msg: []const u8) void {
@@ -97,9 +122,6 @@ fn walletFrame(chain: *chainmod.Chain) !void {
                 _ = chain.generateToAddress(1, addr) catch return;
                 setStatus("Mined 1 block");
             }
-            if (dvui.menuItemLabel(@src(), "Quit", .{}, .{})) |_| {
-                // window close handled by backend
-            }
         }
         if (dvui.menuItemLabel(@src(), "Settings", .{ .submenu = true }, .{})) |r| {
             var fm = dvui.floatingMenu(@src(), .{ .from = r }, .{});
@@ -120,7 +142,7 @@ fn walletFrame(chain: *chainmod.Chain) !void {
         }
     }
 
-    // Tab bar
+    // Tab bar + node status
     {
         var tabs = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 8, .y = 4 } });
         defer tabs.deinit();
@@ -129,8 +151,18 @@ fn walletFrame(chain: *chainmod.Chain) !void {
         if (dvui.button(@src(), "Receive", .{}, .{})) current_tab = .receive;
         if (dvui.button(@src(), "Transactions", .{}, .{})) current_tab = .transactions;
         if (dvui.button(@src(), "Address Book", .{}, .{})) current_tab = .addresses;
-    }
 
+        var sp = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        sp.deinit();
+
+        // Node status indicator
+        const status_label = if (node_connected) "Node: connected" else "Node: offline";
+        const status_btn = dvui.button(@src(), status_label, .{}, .{});
+        if (status_btn) {
+            // toggle for demo
+            node_connected = !node_connected;
+        }
+    }
     // Content
     var content = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .margin = .{ .x = 12, .y = 8 } });
     defer content.deinit();
@@ -181,9 +213,8 @@ fn overviewTab(chain: *chainmod.Chain) !void {
     var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
     defer row.deinit();
 
-    // Left: wallet summary
     {
-        var left = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .vertical, .margin = .{ .x = 0, .y = 0 }, .padding = .{ .x = 12, .y = 8 }, .background = true });
+        var left = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .vertical, .padding = .{ .x = 12, .y = 8 }, .background = true });
         defer left.deinit();
         dvui.label(@src(), "Wallet", .{}, .{ .font = .{ .size = 16 } });
         var ab: [48]u8 = undefined;
@@ -196,7 +227,6 @@ fn overviewTab(chain: *chainmod.Chain) !void {
         dvui.labelNoFmt(@src(), hs, .{}, .{});
     }
 
-    // Right: recent
     {
         var right = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .margin = .{ .x = 8, .y = 0 }, .padding = .{ .x = 8, .y = 8 } });
         defer right.deinit();
@@ -217,7 +247,7 @@ fn overviewTab(chain: *chainmod.Chain) !void {
 fn sendTab(chain: *chainmod.Chain) !void {
     _ = chain;
     dvui.label(@src(), "Send", .{}, .{ .font = .{ .size = 16 } });
-    dvui.label(@src(), "Send form coming next — use Generate / New Address for now.", .{}, .{});
+    dvui.label(@src(), "Send form coming next.", .{}, .{});
 }
 
 fn receiveTab(chain: *chainmod.Chain) !void {
