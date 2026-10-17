@@ -256,25 +256,32 @@ fn overviewTab(chain: *chainmod.Chain) !void {
 }
 
 fn sendTab(chain: *chainmod.Chain) !void {
-    dvui.label(@src(), "Send", .{}, .{ .font = .{ .size = 16 } });
+    var form = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .horizontal, .margin = .{ .x = 8, .y = 8 } });
+    defer form.deinit();
 
-    dvui.label(@src(), "To address", .{}, .{ .margin = .{ .x = 0, .y = 6 } });
+    dvui.label(@src(), "Send", .{}, .{ .font = .{ .size = 16 }, .margin = .{ .x = 0, .y = 4 } });
+
+    dvui.label(@src(), "To address", .{}, .{ .margin = .{ .x = 0, .y = 8 } });
+    var to_box = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 } });
     var to_entry = dvui.textEntry(@src(), .{
         .text = .{ .buffer = send_to[0..send_to_len] },
         .placeholder = "zizz1...",
-    }, .{ .expand = .horizontal });
+    }, .{ .expand = .horizontal, .min_size_content = .{ .h = 28 } });
     defer to_entry.deinit();
     send_to_len = to_entry.len;
+    to_box.deinit();
 
-    dvui.label(@src(), "Amount", .{}, .{ .margin = .{ .x = 0, .y = 6 } });
+    dvui.label(@src(), "Amount", .{}, .{ .margin = .{ .x = 0, .y = 10 } });
+    var amt_box = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 2 } });
     var amt_entry = dvui.textEntry(@src(), .{
         .text = .{ .buffer = send_amt[0..send_amt_len] },
         .placeholder = "0.0",
-    }, .{ .min_size_content = .{ .w = 160 } });
+    }, .{ .min_size_content = .{ .w = 180, .h = 28 } });
     defer amt_entry.deinit();
     send_amt_len = amt_entry.len;
+    amt_box.deinit();
 
-    if (dvui.button(@src(), "Send", .{}, .{ .margin = .{ .x = 0, .y = 10 } })) {
+    if (dvui.button(@src(), "Send", .{}, .{ .margin = .{ .x = 0, .y = 14 } })) {
         const to = send_to[0..send_to_len];
         const amt_str = send_amt[0..send_amt_len];
         if (to.len == 0 or amt_str.len == 0) {
