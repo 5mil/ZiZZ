@@ -11,6 +11,7 @@ const Tab = enum { overview, send, receive, transactions, addresses };
 var status_buf: [160]u8 = undefined;
 var status_len: usize = 0;
 var show_console: bool = false;
+var show_nodes: bool = false;
 var display_zizz: bool = true;
 var current_tab: Tab = .overview;
 var log_lines: [32][120]u8 = undefined;
@@ -146,6 +147,10 @@ fn walletFrame(chain: *chainmod.Chain) !void {
                 show_console = !show_console;
                 m.close();
             }
+            if (dvui.menuItemLabel(@src(), if (show_nodes) "Hide Nodes" else "Show Nodes", .{}, .{}) != null) {
+                show_nodes = !show_nodes;
+                m.close();
+            }
             if (dvui.menuItemLabel(@src(), "New Address", .{}, .{}) != null) {
                 const addr = chain.getNewAddress() catch return;
                 setStatus(addr);
@@ -225,6 +230,23 @@ fn walletFrame(chain: *chainmod.Chain) !void {
         }
     }
 
+
+    // Nodes panel
+    if (show_nodes) {
+        var nbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .horizontal, .margin = .{ .x = 12, .y = 4 }, .padding = .{ .x = 8, .y = 6 }, .background = true });
+        defer nbox.deinit();
+        dvui.label(@src(), "Nodes", .{}, .{ .font = .{ .size = 14 } });
+        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 0, .y = 4 }, .padding = .{ .x = 6, .y = 4 } });
+        defer row.deinit();
+        dvui.label(@src(), "127.0.0.1:8339", .{}, .{ .expand = .horizontal });
+        const ns = if (node_connected) "connected" else "offline";
+        dvui.labelNoFmt(@src(), ns, .{}, .{});
+        if (dvui.button(@src(), "Disconnect", .{}, .{})) {
+            node_connected = false;
+            log("disconnected local node");
+        }
+        dvui.label(@src(), "No other peers. Add via console: addnode <ip>", .{}, .{ .margin = .{ .x = 0, .y = 6 } });
+    }
     // Status bar
     {
         var bar = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .margin = .{ .x = 8, .y = 4 }, .padding = .{ .x = 8, .y = 4 }, .background = true });
