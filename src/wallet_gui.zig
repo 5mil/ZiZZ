@@ -46,6 +46,7 @@ pub fn main(init: std.process.Init) !void {
     while (window_open) {
         const nstime = win.beginWait(interrupted);
         try win.begin(nstime);
+        try backend.addAllEvents(&win);
 
         if (splash_frames > 0) {
             splashFrame();
