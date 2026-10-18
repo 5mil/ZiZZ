@@ -3,6 +3,9 @@ const crypto = std.crypto;
 const ecdsa = crypto.sign.ecdsa;
 const Secp256k1 = crypto.ecc.Secp256k1;
 
+// wallet_crypto is imported by callers that need encrypt/decrypt; keep
+// wallet.zig free of a cycle (wallet_crypto imports HdSeed from here).
+
 pub const PrivateKey = struct {
     bytes: [32]u8,
 
@@ -108,19 +111,12 @@ pub const HdSeed = struct {
         return .{ .bytes = out };
     }
 
-    pub fn encrypt(self: HdSeed, passphrase: []const u8) [32]u8 {
-        var out: [32]u8 = self.bytes;
-        for (0..32) |i| {
-            out[i] ^= passphrase[i % passphrase.len];
-        }
-        return out;
+    /// Zero seed bytes in memory (call after lock / encrypt-and-wipe).
+    pub fn wipe(self: *HdSeed) void {
+        crypto.secureZero(u8, &self.bytes);
     }
 
-    pub fn decrypt(enc: [32]u8, passphrase: []const u8) HdSeed {
-        var out: [32]u8 = enc;
-        for (0..32) |i| {
-            out[i] ^= passphrase[i % passphrase.len];
-        }
-        return .{ .bytes = out };
-    }
+    // NOTE: XOR encrypt/decrypt removed. Use wallet_crypto.zig:
+    //   encryptSeed / decryptSeed / encryptAndSave / loadAndDecrypt
+    // which use Argon2id + ChaCha20-Poly1305.
 };
