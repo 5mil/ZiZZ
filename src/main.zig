@@ -4,6 +4,7 @@ const block = @import("block.zig");
 const hash = @import("hash.zig");
 const chainmod = @import("chain.zig");
 const rpcmod = @import("rpc.zig");
+const p2pmod = @import("p2p.zig");
 
 pub fn main(init: std.process.Init) !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -120,6 +121,10 @@ fn runNode(allocator: std.mem.Allocator, args: []const []const u8, io: std.Io) !
     std.debug.print("RPC port: {d}\n", .{port});
 
     const chain_name = if (regtest) "regtest" else "main";
+    var p2p = p2pmod.P2P.init(allocator, &chain, io, port - 1);
+    defer p2p.deinit();
+    const p2p_thread = try std.Thread.spawn(.{}, p2pmod.P2P.listen, .{&p2p});
+    p2p_thread.detach();
     var server = rpcmod.RpcServer.init(allocator, &chain, port, chain_name, io);
     try server.start();
 }
