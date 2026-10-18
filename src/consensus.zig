@@ -89,8 +89,5 @@ pub fn verifyP2pkh(sig: [64]u8, pubkey: [33]u8, msg_hash: [32]u8) bool {
     return true;
 }
 
-/// Subsidy schedule summary:
-/// - Base: 50 ZiZZ
-/// - Triangle wave ±20 ZiZZ, period 2100 blocks
-/// - ~5% decay every 100,000 blocks (integer)
-/// - Floor at 0
+
+// Subsidy: base 50 ZiZZ, triangle wave ±20 period 2100, ~5% decay every 100k blocks, floor 0.
