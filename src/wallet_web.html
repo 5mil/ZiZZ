@@ -53,7 +53,7 @@ a{color:#60a5fa}
 </div>
 <div id=tx class=page>
 <h2>Transactions</h2>
-<table><thead><tr><th>Height</th><th>Address</th><th>Amount</th></tr></thead><tbody id=txs></tbody></table>
+<table><thead><tr><th>From</th><th>To</th><th>Amount</th></tr></thead><tbody id=txs></tbody></table>
 </div>
 <div id=mine class=page>
 <h2>Mining</h2>
@@ -89,7 +89,7 @@ async function doMine(){const n=parseInt(document.getElementById('nblocks').valu
 async function doMineCont(){for(let i=0;i<5;i++){await mineN(1);await new Promise(r=>setTimeout(r,200));}refresh();}
 async function doNew(){const a=await newAddress();document.getElementById('newaddr').textContent=a;refresh();}
 async function doSend(){const to=document.getElementById('to').value;const amt=Math.floor(parseFloat(document.getElementById('amt').value)*1e8);if(to&&amt){await send(to,amt);refresh();alert('sent');}}
-async function loadTx(){const r=await listTxs();const d=JSON.parse(r);document.getElementById('txs').innerHTML=d.map(t=>`<tr><td>${t.h}</td><td>${t.a.slice(0,18)}...</td><td>${(t.s/1e8).toFixed(8)}</td></tr>`).join('');}
+async function loadTx(){const r=await listTxs();const d=JSON.parse(r);document.getElementById('txs').innerHTML=d.map(t=>`<tr><td>${(t.from||'').slice(0,16)}...</td><td>${(t.to||'').slice(0,16)}...</td><td>${(t.amt/1e8).toFixed(8)}</td></tr>`).join('');}
 async function loadAddr(){const r=await listAddrs();const d=JSON.parse(r);document.getElementById('addrs').innerHTML=d.map((a,i)=>`<tr><td>${i+1}</td><td>${a.a.slice(0,20)}...</td><td>${(a.b/1e8).toFixed(8)}</td></tr>`).join('');}
 async function runCmd(){
   const c=document.getElementById('ccmd').value.trim();

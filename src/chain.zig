@@ -3,6 +3,7 @@ const consensus = @import("consensus.zig");
 const block = @import("block.zig");
 const hashmod = @import("hash.zig");
 const wallet = @import("wallet.zig");
+const txmod = @import("tx.zig");
 
 pub const Block = struct {
     header: block.BlockHeader,
@@ -16,6 +17,7 @@ pub const Chain = struct {
     blocks: std.array_list.Managed(Block),
     balances: std.StringHashMap(consensus.Amount),
     keys: std.StringHashMap(wallet.PrivateKey),
+    txs: std.array_list.Managed(txmod.Tx),
     io: std.Io,
     next_address_id: u32 = 1,
 
@@ -25,6 +27,7 @@ pub const Chain = struct {
             .blocks = std.array_list.Managed(Block).init(allocator),
             .balances = std.StringHashMap(consensus.Amount).init(allocator),
             .keys = std.StringHashMap(wallet.PrivateKey).init(allocator),
+            .txs = std.array_list.Managed(txmod.Tx).init(allocator),
             .io = io,
         };
     }
@@ -111,12 +114,33 @@ pub const Chain = struct {
     pub fn sendToAddress(self: *Chain, from: []const u8, to: []const u8, amount: consensus.Amount) !void {
         const bal = self.getBalance(from);
         if (bal < amount) return error.InsufficientFunds;
-        // debit
+        const priv = self.keys.get(from) orelse return error.NoKey;
+        var t = txmod.Tx{ .from = from, .to = to, .amount = amount, .fee = 0 };
+        try t.sign(priv);
         const from_entry = self.balances.getEntry(from) orelse return error.InsufficientFunds;
         from_entry.value_ptr.* -= amount;
-        // credit
         try self.credit(to, amount);
+        try self.txs.append(t);
         try self.save();
+    }
+
+    pub fn listTxs(self: *Chain, allocator: std.mem.Allocator) ![]const u8 {
+        var list = std.array_list.Managed(u8).init(allocator);
+        defer list.deinit();
+        try list.appendSlice("[");
+        var i: usize = self.txs.items.len;
+        var n: usize = 0;
+        while (i > 0 and n < 30) {
+            i -= 1;
+            const t = self.txs.items[i];
+            if (n > 0) try list.appendSlice(",");
+            const piece = try std.fmt.allocPrint(allocator, "{{\"from\":\"{s}\",\"to\":\"{s}\",\"amt\":{d}}}", .{ t.from, t.to, t.amount });
+            defer allocator.free(piece);
+            try list.appendSlice(piece);
+            n += 1;
+        }
+        try list.appendSlice("]");
+        return list.toOwnedSlice();
     }
 
     pub fn listBalances(self: *Chain, allocator: std.mem.Allocator) ![]const u8 {

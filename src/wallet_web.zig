@@ -85,20 +85,20 @@ fn listAddrs(e: *webui.Event) void {
 
 fn listTxs(e: *webui.Event) void {
     if (g_chain) |c| {
-        var buf: [2048]u8 = undefined;
+        var buf: [4096]u8 = undefined;
         var len: usize = 0;
         buf[len] = '[';
         len += 1;
-        var i: usize = c.blocks.items.len;
+        var i: usize = c.txs.items.len;
         var count: usize = 0;
-        while (i > 0 and count < 20) {
+        while (i > 0 and count < 30) {
             i -= 1;
-            const b = c.blocks.items[i];
+            const t = c.txs.items[i];
             if (count > 0) {
                 buf[len] = ',';
                 len += 1;
             }
-            const s = std.fmt.bufPrint(buf[len..], "{{\"h\":{d},\"a\":\"{s}\",\"s\":{d}}}", .{ b.height, b.coinbase_address, b.subsidy }) catch break;
+            const s = std.fmt.bufPrint(buf[len..], "{{\"from\":\"{s}\",\"to\":\"{s}\",\"amt\":{d}}}", .{ t.from, t.to, t.amount }) catch break;
             len += s.len;
             count += 1;
         }
