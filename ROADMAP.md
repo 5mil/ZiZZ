@@ -60,3 +60,10 @@ The wick stays lit.
 - [x] Remove XOR passphrase stub
 - [ ] BIP39 mnemonic backup
 - [ ] RPC unlock gate for dumpprivkey
+
+## Addresses
+
+- [x] BIP-173 bech32 P2WPKH (`zizz1q…`)
+- [x] BIP-350 bech32m P2TR encode helper
+- [x] Send path validates address checksum
+- [ ] Script VM for spending

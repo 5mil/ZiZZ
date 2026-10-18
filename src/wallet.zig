@@ -2,6 +2,8 @@ const std = @import("std");
 const crypto = std.crypto;
 const ecdsa = crypto.sign.ecdsa;
 const Secp256k1 = crypto.ecc.Secp256k1;
+const ripemd160 = @import("ripemd160.zig");
+const bech32 = @import("bech32.zig");
 
 // wallet_crypto is imported by callers that need encrypt/decrypt; keep
 // wallet.zig free of a cycle (wallet_crypto imports HdSeed from here).
@@ -82,12 +84,31 @@ fn base58Encode(data: []const u8, out: []u8) !usize {
     return zeros + (size - i);
 }
 
+/// P2WPKH address: bech32(HRP=zizz, witver=0, HASH160(compressed pubkey)).
+/// Copy-paste safe: BIP-173 charset + checksum (typos fail decode).
 pub fn addressFromPubkey(allocator: std.mem.Allocator, pubkey: [33]u8) ![]u8 {
-    var sha = crypto.hash.sha2.Sha256.init(.{});
-    sha.update(&pubkey);
-    var h: [32]u8 = undefined;
-    sha.final(&h);
-    return try std.fmt.allocPrint(allocator, "zizz1{x}", .{std.fmt.bytesToHex(h[0..20], .lower)});
+    var prog: [20]u8 = undefined;
+    ripemd160.hash160(&pubkey, &prog);
+    var buf: [90]u8 = undefined;
+    const s = try bech32.encodeSegwit(bech32.hrp_main, 0, &prog, &buf);
+    return try allocator.dupe(u8, s);
+}
+
+/// P2TR address: bech32m(HRP=zizz, witver=1, 32-byte x-only pubkey).
+pub fn addressP2trFromXOnly(allocator: std.mem.Allocator, xonly: [32]u8) ![]u8 {
+    var buf: [90]u8 = undefined;
+    const s = try bech32.encodeSegwit(bech32.hrp_main, 1, &xonly, &buf);
+    return try allocator.dupe(u8, s);
+}
+
+/// Validate a ZiZZ native segwit address (P2WPKH / P2WSH / P2TR).
+pub fn isValidAddress(addr: []const u8) bool {
+    return bech32.isValidZizzAddress(addr);
+}
+
+/// Decode witness program from a valid ZiZZ address.
+pub fn decodeAddress(addr: []const u8, program_out: []u8) !struct { witver: u5, program_len: usize } {
+    return bech32.decodeSegwitAddress(addr, bech32.hrp_main, program_out);
 }
 
 pub const HdSeed = struct {

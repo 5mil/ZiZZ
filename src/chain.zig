@@ -62,7 +62,11 @@ pub const Chain = struct {
         try self.load();
         if (self.blocks.items.len > 0) return;
         const hdr = block.createGenesisHeader();
-        const genesis_addr = try self.allocator.dupe(u8, "zizz1genesis");
+        var genesis_prog = [_]u8{0} ** 20;
+        var genesis_buf: [90]u8 = undefined;
+        const bech32 = @import("bech32.zig");
+        const genesis_str = try bech32.encodeSegwit(bech32.hrp_main, 0, &genesis_prog, &genesis_buf);
+        const genesis_addr = try self.allocator.dupe(u8, genesis_str);
         try self.blocks.append(.{
             .header = hdr,
             .height = 0,
@@ -154,6 +158,7 @@ pub const Chain = struct {
 
 
     pub fn sendToAddress(self: *Chain, from: []const u8, to: []const u8, amount: consensus.Amount) !void {
+        if (!wallet.isValidAddress(to)) return error.InvalidAddress;
         const bal = self.getBalance(from);
         if (bal < amount) return error.InsufficientFunds;
         const priv = self.keys.get(from) orelse return error.NoKey;
@@ -347,7 +352,11 @@ pub const Chain = struct {
             var n: u32 = 0;
             while (n < h) : (n += 1) {
                 const hdr = block.BlockHeader{ .nonce = n };
-                const addr = try self.allocator.dupe(u8, "zizz1snap");
+                var snap_prog = [_]u8{0} ** 20;
+                var snap_buf: [90]u8 = undefined;
+                const bech32 = @import("bech32.zig");
+                const snap_str = try bech32.encodeSegwit(bech32.hrp_main, 0, &snap_prog, &snap_buf);
+                const addr = try self.allocator.dupe(u8, snap_str);
                 try self.blocks.append(.{ .header = hdr, .height = n, .subsidy = consensus.getBlockSubsidy(n), .coinbase_address = addr });
             }
         }
