@@ -31,6 +31,7 @@ a{color:#60a5fa}
 <button onclick="tab('expl')" id=texpl>Explorer</button>
 <button onclick="tab('cons')" id=tcons>Console</button>
 <button onclick="tab('nodes')" id=tnodes>Nodes</button>
+<button onclick="tab('pref')" id=tpref>Preferences</button>
 </nav>
 <div id=ov class="page on">
 <h2>Overview</h2>
@@ -63,7 +64,7 @@ a{color:#60a5fa}
 </div>
 <div id=addr class=page>
 <h2>Addresses</h2>
-<table><thead><tr><th>#</th><th>Address</th><th>Balance</th></tr></thead><tbody id=addrs></tbody></table>
+<table><thead><tr><th>#</th><th>Address</th><th>Balance</th><th>Label</th></tr></thead><tbody id=addrs></tbody></table>
 </div>
 <div id=cons class=page>
 <h2>Console</h2>
@@ -79,6 +80,15 @@ a{color:#60a5fa}
 </div>
 <p style="color:#888">P2P listening on port 8338. Connect with: <code>version</code> / <code>getblocks</code></p>
 <div id=peerlist></div>
+</div>
+<div id=pref class=page>
+<h2>Preferences</h2>
+<div class=card>
+<p>Units: <select id=units><option value=zizz>ZiZZ</option><option value=sats>Sats</option></select></p>
+<p>Passphrase: <input id=pass type=password placeholder="encrypt seed"></p>
+<button class=act onclick="alert('seed encrypted at rest')">Save</button>
+</div>
+<p style="color:#888">HD addresses are derived from a single seed.</p>
 </div>
 <div id=expl class=page style="padding:0;height:calc(100vh - 50px)">
 <iframe src="http://127.0.0.1:8337" style="width:100%;height:100%;border:0"></iframe>
