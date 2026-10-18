@@ -59,6 +59,9 @@ pub fn build(b: *std.Build) void {
         .name = "zizz-web",
         .root_module = web_mod,
     });
+    if (target.result.os.tag == .windows) {
+        web.subsystem = .windows;
+    }
     b.installArtifact(web);
 
 }

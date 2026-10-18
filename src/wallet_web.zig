@@ -19,6 +19,15 @@ pub fn main(init: std.process.Init) !void {
     _ = win.bind("listAddrs", listAddrs) catch 0;
     _ = win.bind("listTxs", listTxs) catch 0;
 
+    const splash =
+        \\n<!DOCTYPE html><html><head><title>ZiZZ</title>
+        \\n<style>body{margin:0;background:#0a0a0f;display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;font-family:system-ui}
+        \\n.logo{font-size:64px;font-weight:300;letter-spacing:8px}</style></head>
+        \\n<body><div class=logo>ZiZZ</div></body></html>
+    ;
+    win.show(splash) catch {};
+    // brief splash then main
+    std.time.sleep(800 * std.time.ns_per_ms);
     const html = @embedFile("wallet_web.html");
     win.show(html) catch {};
     webui.wait();

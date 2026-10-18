@@ -59,9 +59,7 @@ pub const Chain = struct {
     }
 
     pub fn ensureGenesis(self: *Chain) !void {
-        std.debug.print("ensureGenesis: calling load\n", .{});
         try self.load();
-        std.debug.print("after load blocks={d}\n", .{self.blocks.items.len});
         if (self.blocks.items.len > 0) return;
         const hdr = block.createGenesisHeader();
         const genesis_addr = try self.allocator.dupe(u8, "zizz1genesis");
