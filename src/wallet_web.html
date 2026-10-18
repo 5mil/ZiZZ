@@ -36,7 +36,7 @@ a{color:#60a5fa}
 <h2>Overview</h2>
 <div class=card>
 <div class=big id=bal>0 ZiZZ</div>
-<p style="color:#888">Height: <span id=h>0</span></p>
+<p style="color:#888">Height: <span id=h>0</span> · UTXOs: <span id=u>0</span></p>
 </div>
 <p><a href="http://127.0.0.1:8337" target=_blank>Open Explorer ↗</a></p>
 </div>
@@ -84,7 +84,7 @@ a{color:#60a5fa}
 </div>
 <script>
 function tab(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));document.getElementById(id).classList.add('on');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));document.getElementById('t'+id).classList.add('on');if(id=='tx')loadTx();if(id=='addr')loadAddr();}
-async function refresh(){try{const r=await getInfo();const d=JSON.parse(r);document.getElementById('h').textContent=d.height;document.getElementById('bal').textContent=(d.balance/1e8).toFixed(8)+' ZiZZ';}catch(e){}}
+async function refresh(){try{const r=await getInfo();const d=JSON.parse(r);document.getElementById('h').textContent=d.height;document.getElementById('bal').textContent=(d.balance/1e8).toFixed(8)+' ZiZZ';if(d.utxos!=null)document.getElementById('u').textContent=d.utxos;}catch(e){}}
 async function doMine(){const n=parseInt(document.getElementById('nblocks').value)||1;await mineN(n);refresh();}
 async function doMineCont(){for(let i=0;i<5;i++){await mineN(1);await new Promise(r=>setTimeout(r,200));}refresh();}
 async function doNew(){const a=await newAddress();document.getElementById('newaddr').textContent=a;refresh();}

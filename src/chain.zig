@@ -12,12 +12,21 @@ pub const Block = struct {
     coinbase_address: []u8,
 };
 
+pub const Utxo = struct {
+    id: u64,
+    address: []const u8,
+    amount: consensus.Amount,
+    spent: bool = false,
+};
+
 pub const Chain = struct {
     allocator: std.mem.Allocator,
     blocks: std.array_list.Managed(Block),
     balances: std.StringHashMap(consensus.Amount),
     keys: std.StringHashMap(wallet.PrivateKey),
     txs: std.array_list.Managed(txmod.Tx),
+    utxos: std.array_list.Managed(Utxo),
+    next_utxo: u64 = 1,
     io: std.Io,
     next_address_id: u32 = 1,
 
@@ -28,6 +37,7 @@ pub const Chain = struct {
             .balances = std.StringHashMap(consensus.Amount).init(allocator),
             .keys = std.StringHashMap(wallet.PrivateKey).init(allocator),
             .txs = std.array_list.Managed(txmod.Tx).init(allocator),
+            .utxos = std.array_list.Managed(Utxo).init(allocator),
             .io = io,
         };
     }
@@ -97,6 +107,26 @@ pub const Chain = struct {
             break :blk self.balances.getEntry(owned).?;
         };
         entry.value_ptr.* += amount;
+        const addr_owned = try self.allocator.dupe(u8, address);
+        try self.utxos.append(.{ .id = self.next_utxo, .address = addr_owned, .amount = amount });
+        self.next_utxo += 1;
+    }
+
+    fn selectUtxos(self: *Chain, address: []const u8, need: consensus.Amount) ![]Utxo {
+        var selected = std.array_list.Managed(Utxo).init(self.allocator);
+        var total: consensus.Amount = 0;
+        for (self.utxos.items) |*u| {
+            if (u.spent) continue;
+            if (!std.mem.eql(u8, u.address, address)) continue;
+            try selected.append(u.*);
+            total += u.amount;
+            if (total >= need) break;
+        }
+        if (total < need) {
+            selected.deinit();
+            return error.InsufficientFunds;
+        }
+        return selected.toOwnedSlice();
     }
 
     pub fn getBalance(self: *const Chain, address: []const u8) consensus.Amount {
@@ -115,11 +145,26 @@ pub const Chain = struct {
         const bal = self.getBalance(from);
         if (bal < amount) return error.InsufficientFunds;
         const priv = self.keys.get(from) orelse return error.NoKey;
+        const selected = try self.selectUtxos(from, amount);
+        defer self.allocator.free(selected);
+        var total: consensus.Amount = 0;
+        for (selected) |u| total += u.amount;
         var t = txmod.Tx{ .from = from, .to = to, .amount = amount, .fee = 0 };
         try t.sign(priv);
+        // mark spent
+        for (selected) |u| {
+            for (self.utxos.items) |*live| {
+                if (live.id == u.id) live.spent = true;
+            }
+        }
         const from_entry = self.balances.getEntry(from) orelse return error.InsufficientFunds;
         from_entry.value_ptr.* -= amount;
         try self.credit(to, amount);
+        // change
+        const change = total - amount;
+        if (change > 0) {
+            try self.credit(from, change);
+        }
         try self.txs.append(t);
         try self.save();
     }
@@ -262,6 +307,16 @@ pub const Chain = struct {
                 .coinbase_address = addr_owned,
             });
             try self.credit(addr, subsidy);
+        }
+        if (self.utxos.items.len == 0) {
+            var it = self.balances.iterator();
+            while (it.next()) |e| {
+                if (e.value_ptr.* > 0) {
+                    const addr_owned = try self.allocator.dupe(u8, e.key_ptr.*);
+                    try self.utxos.append(.{ .id = self.next_utxo, .address = addr_owned, .amount = e.value_ptr.* });
+                    self.next_utxo += 1;
+                }
+            }
         }
     }
 

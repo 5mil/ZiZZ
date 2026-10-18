@@ -26,7 +26,7 @@ pub fn main(init: std.process.Init) !void {
 
 fn getInfo(e: *webui.Event) void {
     if (g_chain) |c| {
-        const s = std.fmt.bufPrint(&info_buf, "{{\"height\":{d},\"balance\":{d}}}", .{ c.tipHeight(), c.getTotalBalance() }) catch return;
+        const s = std.fmt.bufPrint(&info_buf, "{{\"height\":{d},\"balance\":{d},\"utxos\":{d}}}", .{ c.tipHeight(), c.getTotalBalance(), c.utxos.items.len }) catch return;
         returnZ(e, s);
     }
 }
