@@ -230,7 +230,7 @@ pub const Chain = struct {
                 .version = 1,
                 .prev_block = self.tipHash(),
                 .timestamp = @intCast(@divTrunc(std.Io.Clock.real.now(self.io).nanoseconds, std.time.ns_per_s)),
-                .bits = 0x207fffff,
+                .bits = if (self.blocks.items.len > 0) self.blocks.items[self.blocks.items.len-1].header.bits else 0x207fffff,
                 .nonce = i,
             };
             const addr_owned = try self.allocator.dupe(u8, address);

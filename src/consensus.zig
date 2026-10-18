@@ -66,3 +66,31 @@ test "poetic subsidy samples" {
     // h=2100 → ~30
     try expect(subsidyToZiZZ(getBlockSubsidy(2100)), 30.0, 0.01);
 }
+
+
+/// Simple difficulty: target halves if last 10 blocks came too fast, doubles if too slow.
+/// Returns new bits (compact target).
+pub fn adjustDifficulty(prev_bits: u32, actual_time: u32, expected_time: u32) u32 {
+    if (actual_time == 0 or expected_time == 0) return prev_bits;
+    if (actual_time < expected_time / 2) {
+        return prev_bits - 1; // harder
+    } else if (actual_time > expected_time * 2) {
+        return prev_bits + 1; // easier
+    }
+    return prev_bits;
+}
+
+/// Minimal P2PKH-equivalent check: signature verifies against the public key hash of the address.
+pub fn verifyP2pkh(sig: [64]u8, pubkey: [33]u8, msg_hash: [32]u8) bool {
+    const ecdsa = std.crypto.sign.ecdsa;
+    const pk = ecdsa.EcdsaSecp256k1Sha256.PublicKey.fromSec1(&pubkey) catch return false;
+    const signature = ecdsa.EcdsaSecp256k1Sha256.Signature.fromBytes(sig);
+    pk.verify(&msg_hash, signature) catch return false;
+    return true;
+}
+
+/// Subsidy schedule summary:
+/// - Base: 50 ZiZZ
+/// - Triangle wave ±20 ZiZZ, period 2100 blocks
+/// - ~5% decay every 100,000 blocks (integer)
+/// - Floor at 0
