@@ -1,7 +1,7 @@
 # ZiZZ Release Notes
 
 ## Status
-Experimental. Not for real value. Crypto is unaudited.
+Experimental. Not for real value. Crypto is unaudited — test coins only.
 
 ## Binaries
 - `releases/zizz-web-windows-x86_64.exe` — Windows wallet (webview)
@@ -13,17 +13,29 @@ Experimental. Not for real value. Crypto is unaudited.
 - Local chain with append-only log and atomic snapshot
 - Signed transactions and UTXO set
 - Minimal P2P (handshake, getblocks)
-- HD wallet, labels, passphrase encryption stub
+- HD wallet, labels
+- **Wallet seed encryption: Argon2id KDF + ChaCha20-Poly1305 AEAD** (file `zizz-wallet.enc`)
 - Difficulty adjustment and P2PKH verification
 - Webview wallet with explorer tab, continuous mining, hashrate
 - Local explorer on :8337 with search
 
+## Wallet encryption
+- **KDF:** Argon2id (default m=64 MiB, t=3, p=1; stored in blob)
+- **AEAD:** ChaCha20-Poly1305 with random salt + nonce
+- **AAD:** `zizz-seed-v1`
+- **File:** `zizz-wallet.enc` (98-byte fixed layout, magic `ZiZZWLT1`)
+- Encrypt & lock, Unlock, Lock from Preferences in the web wallet
+- Wrong passphrase / tampered file → authentication failure (fail closed)
+- XOR passphrase stub **removed**
+
+See `src/wallet_crypto.zig` and `WALLET_ENCRYPTION.md`.
+
 ## Known limitations
 - No full block sync between peers yet
-- Encryption is XOR, not a proper KDF
 - No installer; binaries only
 - Single-file chain; no pruning
 - Not compatible with Bitcoin
+- Encryption protects seed at rest only (not RAM while unlocked; not a formal audit)
 
 ## Running
 ```

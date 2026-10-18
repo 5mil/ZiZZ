@@ -53,3 +53,10 @@ Goal: A durable, production-quality Bitcoin-family full node implemented **entir
 The same durable-test stance as FIZZ: strong but basic, no monetary claims, kept alive for real integration work.
 
 The wick stays lit.
+
+## Wallet security
+
+- [x] Argon2id + ChaCha20-Poly1305 seed encryption (`wallet_crypto.zig`)
+- [x] Remove XOR passphrase stub
+- [ ] BIP39 mnemonic backup
+- [ ] RPC unlock gate for dumpprivkey
