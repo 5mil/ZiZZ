@@ -60,7 +60,8 @@ a{color:#60a5fa}
 <h2>Mining</h2>
 <input id=nblocks value="1" style=width:80px> blocks<br>
 <button class=act onclick="doMine()">Mine</button>
-<button class=act onclick="doMineCont()">Mine Continuous</button>
+<button class=act onclick="toggleCont()" id=contbtn>Start Continuous</button>
+<span id=hr style="margin-left:12px;color:#888">0 H/s</span>
 </div>
 <div id=addr class=page>
 <h2>Addresses</h2>
@@ -97,7 +98,21 @@ a{color:#60a5fa}
 function tab(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));document.getElementById(id).classList.add('on');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));document.getElementById('t'+id).classList.add('on');if(id=='tx')loadTx();if(id=='addr')loadAddr();}
 async function refresh(){try{const r=await getInfo();const d=JSON.parse(r);document.getElementById('h').textContent=d.height;document.getElementById('bal').textContent=(d.balance/1e8).toFixed(8)+' ZiZZ';if(d.utxos!=null)document.getElementById('u').textContent=d.utxos;}catch(e){}}
 async function doMine(){const n=parseInt(document.getElementById('nblocks').value)||1;await mineN(n);refresh();}
-async function doMineCont(){for(let i=0;i<5;i++){await mineN(1);await new Promise(r=>setTimeout(r,200));}refresh();}
+let cont=false,hashes=0,last=Date.now();
+async function toggleCont(){
+  cont=!cont;
+  document.getElementById('contbtn').textContent=cont?'Stop':'Start Continuous';
+  if(cont) loop();
+}
+async function loop(){
+  while(cont){
+    await mineN(1);
+    hashes++;
+    const now=Date.now();
+    if(now-last>1000){document.getElementById('hr').textContent=Math.round(hashes*1000/(now-last))+' H/s';hashes=0;last=now;}
+    refresh();
+  }
+}
 async function doNew(){const a=await newAddress();document.getElementById('newaddr').textContent=a;refresh();}
 async function doSend(){const to=document.getElementById('to').value;const amt=Math.floor(parseFloat(document.getElementById('amt').value)*1e8);if(to&&amt){await send(to,amt);refresh();alert('sent');}}
 async function loadTx(){const r=await listTxs();const d=JSON.parse(r);document.getElementById('txs').innerHTML=d.map(t=>`<tr><td>${(t.from||'').slice(0,16)}...</td><td>${(t.to||'').slice(0,16)}...</td><td>${(t.amt/1e8).toFixed(8)}</td></tr>`).join('');}

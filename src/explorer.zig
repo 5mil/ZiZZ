@@ -49,9 +49,12 @@ fn handle(io: std.Io, stream: *std.Io.net.Stream, chain: *chainmod.Chain, alloca
         try body.appendSlice("]}");
     } else {
         try body.appendSlice("<!DOCTYPE html><html><head><title>ZiZZ Explorer</title>");
-        try body.appendSlice("<style>body{font-family:sans-serif;background:#111;color:#eee;padding:20px}");
+        try body.appendSlice("<style>body{font-family:system-ui;background:#0a0a0f;color:#e8e8f0;padding:20px}input{padding:8px;background:#16161f;color:#fff;border:1px solid #2a2a3e;border-radius:6px}table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #222}");
         try body.appendSlice("table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #333}");
         try body.appendSlice("</style></head><body>");
+        try body.appendSlice("<h1>ZiZZ Explorer</h1>");
+        try body.appendSlice("<input id=q placeholder=\"height, address, or txid\" oninput=\"filter()\">");
+        try body.appendSlice("<p>Height: <span id=h></span></p>");
         try body.appendSlice("<h1>ZiZZ Explorer</h1>");
         try body.appendSlice("<p>Height: <span id=h></span></p>");
         try body.appendSlice("<table><thead><tr><th>Height</th><th>Address</th></tr></thead><tbody id=t></tbody></table>");
