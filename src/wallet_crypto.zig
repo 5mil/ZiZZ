@@ -235,6 +235,7 @@ pub fn fileExists(io: std.Io) bool {
 
 test "roundtrip argon2id + chacha20poly1305" {
     const allocator = std.testing.allocator;
+    // Deterministic fake Io.random for the test via manual encrypt path
     var seed = wallet.HdSeed{ .bytes = .{
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
         17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
@@ -264,6 +265,7 @@ test "roundtrip argon2id + chacha20poly1305" {
     const out = try decryptSeed(allocator, parsed, "correct horse battery staple");
     try std.testing.expectEqualSlices(u8, &seed.bytes, &out.bytes);
 
+    // wrong password must fail
     try std.testing.expectError(error.AuthenticationFailed, decryptSeed(allocator, parsed, "wrong"));
 }
 
@@ -277,7 +279,7 @@ test "tamper fails auth" {
     var ct: [seed_len]u8 = undefined;
     var tag: [tag_len]u8 = undefined;
     crypto.aead.chacha_poly.ChaCha20Poly1305.encrypt(&ct, &tag, &seed_bytes, aad, nonce, key);
-    ct[0] ^= 0x01;
+    ct[0] ^= 0x01; // flip a ciphertext bit
     const enc = EncryptedSeed{
         .salt = salt,
         .nonce = nonce,

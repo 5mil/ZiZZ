@@ -86,10 +86,14 @@ a{color:#60a5fa}
 <h2>Preferences</h2>
 <div class=card>
 <p>Units: <select id=units><option value=zizz>ZiZZ</option><option value=sats>Sats</option></select></p>
-<p>Passphrase: <input id=pass type=password placeholder="encrypt seed"></p>
-<button class=act onclick="alert('seed encrypted at rest')">Save</button>
+<p style="color:#888;margin-top:12px">Wallet encryption (Argon2id + ChaCha20-Poly1305)</p>
+<p>Passphrase: <input id=pass type=password placeholder="min 8 characters" autocomplete="new-password"></p>
+<button class=act onclick="doEncrypt()">Encrypt & lock</button>
+<button class=act onclick="doUnlock()">Unlock</button>
+<button class=act onclick="doLock()">Lock</button>
+<p id=cryptostat style="color:#888;margin-top:8px">Status: —</p>
 </div>
-<p style="color:#888">HD addresses are derived from a single seed.</p>
+<p style="color:#888">HD seed is stored in <code>zizz-wallet.enc</code> after encrypt. Wrong passphrase fails closed. XOR stub removed.</p>
 </div>
 <div id=expl class=page style="padding:0;height:calc(100vh - 50px)">
 <iframe src="http://127.0.0.1:8337" style="width:100%;height:100%;border:0"></iframe>
@@ -128,5 +132,30 @@ async function runCmd(){
   else if(c) log.innerHTML+='unknown<br>';
   document.getElementById('ccmd').value='';
 }
-setInterval(refresh,2000);refresh();
+
+async function refreshCrypto(){
+  try{
+    const r=await walletCryptoStatus();
+    const d=JSON.parse(r);
+    document.getElementById('cryptostat').textContent=
+      'unlocked='+d.unlocked+' · file='+(d.enc_file?'yes':'no')+' · '+d.kdf+'+'+d.aead;
+  }catch(e){document.getElementById('cryptostat').textContent='status error';}
+}
+async function doEncrypt(){
+  const p=document.getElementById('pass').value;
+  if(!p||p.length<8){alert('Passphrase min 8 chars');return;}
+  const r=await encryptWallet(p);
+  alert(r);refreshCrypto();refresh();
+}
+async function doUnlock(){
+  const p=document.getElementById('pass').value;
+  const r=await unlockWallet(p);
+  alert(r);refreshCrypto();refresh();
+}
+async function doLock(){
+  const r=await lockWallet();
+  alert(r);refreshCrypto();
+}
+setInterval(refresh,2000);refresh();refreshCrypto();
+
 </script></body></html>
