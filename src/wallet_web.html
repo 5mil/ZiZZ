@@ -29,6 +29,8 @@ a{color:#60a5fa}
 <button onclick="tab('mine')" id=tmine>Mining</button>
 <button onclick="tab('addr')" id=taddr>Addresses</button>
 <button onclick="tab('expl')" id=texpl>Explorer</button>
+<button onclick="tab('cons')" id=tcons>Console</button>
+<button onclick="tab('nodes')" id=tnodes>Nodes</button>
 </nav>
 <div id=ov class="page on">
 <h2>Overview</h2>
@@ -63,6 +65,20 @@ a{color:#60a5fa}
 <h2>Addresses</h2>
 <table><thead><tr><th>#</th><th>Address</th><th>Balance</th></tr></thead><tbody id=addrs></tbody></table>
 </div>
+<div id=cons class=page>
+<h2>Console</h2>
+<div id=clog style="background:#16161f;padding:12px;border-radius:8px;height:200px;overflow:auto;font-family:monospace;font-size:13px"></div>
+<input id=ccmd placeholder="help, getbalance, getnewaddress, generate" style="margin-top:8px">
+<button class=act onclick="runCmd()">Run</button>
+</div>
+<div id=nodes class=page>
+<h2>Nodes</h2>
+<div class=card>
+<p>127.0.0.1:8339 — <span id=nstat>local</span></p>
+<button class=act onclick="document.getElementById('nstat').textContent='offline'">Disconnect</button>
+</div>
+<p style="color:#888">No other peers. P2P arrives in Phase 4.</p>
+</div>
 <div id=expl class=page style="padding:0;height:calc(100vh - 50px)">
 <iframe src="http://127.0.0.1:8337" style="width:100%;height:100%;border:0"></iframe>
 </div>
@@ -75,5 +91,16 @@ async function doNew(){const a=await newAddress();document.getElementById('newad
 async function doSend(){const to=document.getElementById('to').value;const amt=Math.floor(parseFloat(document.getElementById('amt').value)*1e8);if(to&&amt){await send(to,amt);refresh();alert('sent');}}
 async function loadTx(){const r=await listTxs();const d=JSON.parse(r);document.getElementById('txs').innerHTML=d.map(t=>`<tr><td>${t.h}</td><td>${t.a.slice(0,18)}...</td><td>${(t.s/1e8).toFixed(8)}</td></tr>`).join('');}
 async function loadAddr(){const r=await listAddrs();const d=JSON.parse(r);document.getElementById('addrs').innerHTML=d.map((a,i)=>`<tr><td>${i+1}</td><td>${a.a.slice(0,20)}...</td><td>${(a.b/1e8).toFixed(8)}</td></tr>`).join('');}
+async function runCmd(){
+  const c=document.getElementById('ccmd').value.trim();
+  const log=document.getElementById('clog');
+  log.innerHTML+='> '+c+'<br>';
+  if(c==='help') log.innerHTML+='commands: help, getbalance, getnewaddress, generate<br>';
+  else if(c==='getbalance'){const r=await getInfo();const d=JSON.parse(r);log.innerHTML+=(d.balance/1e8).toFixed(8)+' ZiZZ<br>';}
+  else if(c==='getnewaddress'){const a=await newAddress();log.innerHTML+=a+'<br>';}
+  else if(c==='generate'){await mineN(1);log.innerHTML+='mined 1<br>';refresh();}
+  else if(c) log.innerHTML+='unknown<br>';
+  document.getElementById('ccmd').value='';
+}
 setInterval(refresh,2000);refresh();
 </script></body></html>

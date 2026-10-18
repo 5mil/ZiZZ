@@ -164,60 +164,114 @@ pub const Chain = struct {
         return hashes;
     }
 
-    const StateFile = "zizz-chain.json";
+
+    const LogFile = "zizz-blocks.log";
+    const SnapFile = "zizz-snapshot.json";
+    const TmpFile = "zizz-snapshot.tmp";
 
     pub fn save(self: *Chain) !void {
-        var file = try std.Io.Dir.cwd().createFile(self.io, StateFile, .{});
-        defer file.close(self.io);
-        var buf: [4096]u8 = undefined;
-        var writer = file.writer(self.io, &buf);
-        try writer.interface.writeAll("{\n  \"blocks\": [\n");
-        for (self.blocks.items, 0..) |b, i| {
+        // append-only log of blocks
+        var logf = try std.Io.Dir.cwd().createFile(self.io, LogFile, .{ .truncate = true });
+        defer logf.close(self.io);
+        var lbuf: [8192]u8 = undefined;
+        var lw = logf.writer(self.io, &lbuf);
+        for (self.blocks.items) |b| {
             const hex = hashmod.hashToHex(b.header.getHash());
-            try writer.interface.print("    {{\"height\":{d},\"subsidy\":{d},\"address\":\"{s}\",\"hash\":\"{s}\"}}", .{ b.height, b.subsidy, b.coinbase_address, &hex });
-            if (i + 1 < self.blocks.items.len) try writer.interface.writeAll(",");
-            try writer.interface.writeAll("\n");
+            try lw.interface.print("{d}|{d}|{s}|{s}\n", .{ b.height, b.subsidy, b.coinbase_address, &hex });
         }
-        try writer.interface.writeAll("  ],\n  \"balances\": {\n");
+        try lw.interface.flush();
+
+        // atomic snapshot
+        var tmp = try std.Io.Dir.cwd().createFile(self.io, TmpFile, .{ .truncate = true });
+        var tbuf: [8192]u8 = undefined;
+        var tw = tmp.writer(self.io, &tbuf);
+        try tw.interface.writeAll("{\"blocks\":");
+        var hbuf: [16]u8 = undefined;
+        const hs = std.fmt.bufPrint(&hbuf, "{d}", .{self.tipHeight()}) catch "0";
+        try tw.interface.writeAll(hs);
+        try tw.interface.writeAll(",\"balances\":{");
         var bit = self.balances.iterator();
         var first = true;
         while (bit.next()) |e| {
-            if (!first) try writer.interface.writeAll(",\n");
+            if (!first) try tw.interface.writeAll(",");
             first = false;
-            try writer.interface.print("    \"{s}\": {d}", .{ e.key_ptr.*, e.value_ptr.* });
+            try tw.interface.print("\"{s}\":{d}", .{ e.key_ptr.*, e.value_ptr.* });
         }
-        try writer.interface.writeAll("\n  }\n}\n");
-        try writer.interface.flush();
+        try tw.interface.writeAll("}}\n");
+        try tw.interface.flush();
+        tmp.close(self.io);
+        try std.Io.Dir.rename(std.Io.Dir.cwd(), TmpFile, std.Io.Dir.cwd(), SnapFile, self.io);
     }
 
     pub fn load(self: *Chain) !void {
-        var file = std.Io.Dir.cwd().openFile(self.io, StateFile, .{}) catch return;
-        defer file.close(self.io);
-        var buf: [4096]u8 = undefined;
-        var reader = file.reader(self.io, &buf);
-        const content = try reader.interface.allocRemaining(self.allocator, .unlimited);
+        // prefer log replay
+        var logf = std.Io.Dir.cwd().openFile(self.io, LogFile, .{}) catch {
+            return self.loadSnapshot();
+        };
+        defer logf.close(self.io);
+        var rbuf: [8192]u8 = undefined;
+        var reader = logf.reader(self.io, &rbuf);
+        const content = reader.interface.allocRemaining(self.allocator, .unlimited) catch return self.loadSnapshot();
         defer self.allocator.free(content);
-        var height: u32 = 0;
-        var it = std.mem.splitSequence(u8, content, "\"height\":");
-        _ = it.next();
-        while (it.next()) |_| height += 1;
-        if (height == 0) return;
-        while (self.blocks.items.len < height) {
-            const h: u32 = @intCast(self.blocks.items.len);
+        var lines = std.mem.splitScalar(u8, content, '\n');
+        while (lines.next()) |line| {
+            if (line.len == 0) continue;
+            var parts = std.mem.splitScalar(u8, line, '|');
+            const hstr = parts.next() orelse continue;
+            const sstr = parts.next() orelse continue;
+            const addr = parts.next() orelse continue;
+            _ = parts.next(); // hash
+            const height = std.fmt.parseInt(u32, hstr, 10) catch continue;
+            const subsidy = std.fmt.parseInt(consensus.Amount, sstr, 10) catch continue;
             const hdr = block.BlockHeader{
                 .version = 1,
                 .prev_block = if (self.blocks.items.len == 0) std.mem.zeroes([32]u8) else self.tipHash(),
-                .timestamp = @intCast(@divTrunc(std.Io.Clock.real.now(self.io).nanoseconds, std.time.ns_per_s)),
+                .timestamp = 0,
                 .bits = 0x207fffff,
-                .nonce = h,
+                .nonce = height,
             };
-            const addr = try self.allocator.dupe(u8, "zizz1restored");
+            const addr_owned = try self.allocator.dupe(u8, addr);
             try self.blocks.append(.{
                 .header = hdr,
-                .height = h,
-                .subsidy = consensus.getBlockSubsidy(h),
-                .coinbase_address = addr,
+                .height = height,
+                .subsidy = subsidy,
+                .coinbase_address = addr_owned,
             });
+            try self.credit(addr, subsidy);
         }
     }
+
+    fn loadSnapshot(self: *Chain) !void {
+        var file = std.Io.Dir.cwd().openFile(self.io, SnapFile, .{}) catch return;
+        defer file.close(self.io);
+        var buf: [4096]u8 = undefined;
+        var reader = file.reader(self.io, &buf);
+        const content = reader.interface.allocRemaining(self.allocator, .unlimited) catch return;
+        defer self.allocator.free(content);
+        // minimal: just count blocks from snapshot height
+        if (std.mem.indexOf(u8, content, "\"blocks\":")) |i| {
+            var end = i + 9;
+            while (end < content.len and content[end] >= '0' and content[end] <= '9') end += 1;
+            const h = std.fmt.parseInt(u32, content[i+9..end], 10) catch 0;
+            var n: u32 = 0;
+            while (n < h) : (n += 1) {
+                const hdr = block.BlockHeader{ .nonce = n };
+                const addr = try self.allocator.dupe(u8, "zizz1snap");
+                try self.blocks.append(.{ .header = hdr, .height = n, .subsidy = consensus.getBlockSubsidy(n), .coinbase_address = addr });
+            }
+        }
+    }
+
+    pub fn resetAndRemine(self: *Chain, n: u32, address: []const u8) !void {
+        for (self.blocks.items) |b| self.allocator.free(b.coinbase_address);
+        self.blocks.clearRetainingCapacity();
+        var it = self.balances.keyIterator();
+        while (it.next()) |k| self.allocator.free(k.*);
+        self.balances.clearRetainingCapacity();
+        _ = std.Io.Dir.cwd().deleteFile(self.io, LogFile) catch {};
+        _ = std.Io.Dir.cwd().deleteFile(self.io, SnapFile) catch {};
+        try self.ensureGenesis();
+        _ = try self.generateToAddress(n, address);
+    }
+
 };

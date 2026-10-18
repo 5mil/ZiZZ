@@ -21,6 +21,13 @@ pub fn main(init: std.process.Init) !void {
 
     if (std.mem.eql(u8, cmd, "node")) {
         try runNode(allocator, args, init.io);
+    } else if (std.mem.eql(u8, cmd, "reset")) {
+        var chain = chainmod.Chain.init(allocator, init.io);
+        defer chain.deinit();
+        const addr = if (args.len > 2) args[2] else "zizz1reset";
+        const n: u32 = if (args.len > 3) std.fmt.parseInt(u32, args[3], 10) catch 20 else 20;
+        try chain.resetAndRemine(n, addr);
+        std.debug.print("reset and remined {d} blocks to {s}\n", .{ n, addr });
     } else if (std.mem.eql(u8, cmd, "subsidy")) {
         if (args.len < 3) {
             std.debug.print("Usage: zizz subsidy <height>\n", .{});
