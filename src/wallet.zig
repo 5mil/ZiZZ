@@ -86,3 +86,41 @@ pub fn addressFromPubkey(allocator: std.mem.Allocator, pubkey: [33]u8) ![]u8 {
     sha.final(&h);
     return try std.fmt.allocPrint(allocator, "zizz1{x}", .{std.fmt.bytesToHex(h[0..20], .lower)});
 }
+
+pub const HdSeed = struct {
+    bytes: [32]u8,
+
+    pub fn generate(io: std.Io) !HdSeed {
+        var b: [32]u8 = undefined;
+        io.random(&b);
+        return .{ .bytes = b };
+    }
+
+    pub fn derive(self: HdSeed, index: u32) PrivateKey {
+        var buf: [36]u8 = undefined;
+        @memcpy(buf[0..32], &self.bytes);
+        std.mem.writeInt(u32, buf[32..36], index, .little);
+        var hasher = crypto.hash.sha2.Sha256.init(.{});
+        hasher.update(&buf);
+        var out: [32]u8 = undefined;
+        hasher.final(&out);
+        if (std.mem.eql(u8, &out, &std.mem.zeroes([32]u8))) out[0] = 1;
+        return .{ .bytes = out };
+    }
+
+    pub fn encrypt(self: HdSeed, passphrase: []const u8) [32]u8 {
+        var out: [32]u8 = self.bytes;
+        for (0..32) |i| {
+            out[i] ^= passphrase[i % passphrase.len];
+        }
+        return out;
+    }
+
+    pub fn decrypt(enc: [32]u8, passphrase: []const u8) HdSeed {
+        var out: [32]u8 = enc;
+        for (0..32) |i| {
+            out[i] ^= passphrase[i % passphrase.len];
+        }
+        return .{ .bytes = out };
+    }
+};

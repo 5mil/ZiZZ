@@ -29,6 +29,8 @@ pub const Chain = struct {
     next_utxo: u64 = 1,
     io: std.Io,
     next_address_id: u32 = 1,
+    seed: ?wallet.HdSeed = null,
+    labels: std.StringHashMap([]const u8),
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io) Chain {
         return .{
@@ -39,6 +41,7 @@ pub const Chain = struct {
             .txs = std.array_list.Managed(txmod.Tx).init(allocator),
             .utxos = std.array_list.Managed(Utxo).init(allocator),
             .io = io,
+            .labels = std.StringHashMap([]const u8).init(allocator),
         };
     }
 
@@ -87,12 +90,23 @@ pub const Chain = struct {
 
 
     pub fn getNewAddress(self: *Chain) ![]const u8 {
-        const priv = try wallet.PrivateKey.generate(self.io);
+        if (self.seed == null) self.seed = try wallet.HdSeed.generate(self.io);
+        const priv = self.seed.?.derive(self.next_address_id);
+        self.next_address_id += 1;
         const pubk = try priv.publicKey();
         const addr = try wallet.addressFromPubkey(self.allocator, pubk);
         try self.balances.put(addr, 0);
         try self.keys.put(addr, priv);
         return addr;
+    }
+
+    pub fn setLabel(self: *Chain, address: []const u8, label: []const u8) !void {
+        const owned = try self.allocator.dupe(u8, label);
+        try self.labels.put(address, owned);
+    }
+
+    pub fn getLabel(self: *Chain, address: []const u8) ?[]const u8 {
+        return self.labels.get(address);
     }
 
     pub fn dumpPrivKey(self: *Chain, address: []const u8) ?[52]u8 {
