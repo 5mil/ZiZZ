@@ -27,7 +27,7 @@ pub fn main(init: std.process.Init) !void {
     ;
     win.show(splash) catch {};
     // brief splash then main
-    std.Io.Clock.real.sleep(init.io, .{ .nanoseconds = 800 * std.time.ns_per_ms }) catch {};
+    std.Io.sleep(init.io, .{ .nanoseconds = 800 * std.time.ns_per_ms }, .real) catch {};
     const html = @embedFile("wallet_web.html");
     win.show(html) catch {};
     webui.wait();
