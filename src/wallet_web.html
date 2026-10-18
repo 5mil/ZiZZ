@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html><head><title>ZiZZ</title>
+<style>
+body{font-family:system-ui;background:#111;color:#eee;margin:0}
+nav{background:#1a1a1a;padding:12px;display:flex;gap:8px}
+nav button{padding:8px 16px;background:#333;color:#fff;border:0;border-radius:4px;cursor:pointer}
+nav button.on{background:#555}
+.page{padding:20px;display:none}
+.page.on{display:block}
+input,textarea{padding:8px;background:#222;color:#fff;border:1px solid #444;width:280px;margin:4px 0}
+button.act{padding:8px 16px;background:#2a6;color:#fff;border:0;border-radius:4px;cursor:pointer;margin:6px 4px}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+td,th{padding:8px;border-bottom:1px solid #333;text-align:left}
+.big{font-size:28px;margin:8px 0}
+</style></head><body>
+<nav>
+<button onclick="tab('ov')" id=tov class=on>Overview</button>
+<button onclick="tab('send')" id=tsend>Send</button>
+<button onclick="tab('recv')" id=trecv>Receive</button>
+<button onclick="tab('tx')" id=ttx>Transactions</button>
+<button onclick="tab('mine')" id=tmine>Mining</button>
+<button onclick="tab('addr')" id=taddr>Addresses</button>
+</nav>
+<div id=ov class="page on">
+<h2>Overview</h2>
+<div class=big id=bal>0 ZiZZ</div>
+<p>Height: <span id=h>0</span></p>
+<p><a href="http://127.0.0.1:8337" target=_blank style=color:#6af>Open Explorer</a></p>
+</div>
+<div id=send class=page>
+<h2>Send</h2>
+<input id=to placeholder="To address"><br>
+<input id=amt placeholder="Amount (ZiZZ)"><br>
+<button class=act onclick="doSend()">Send</button>
+</div>
+<div id=recv class=page>
+<h2>Receive</h2>
+<button class=act onclick="doNew()">New Address</button>
+<div id=newaddr></div>
+</div>
+<div id=tx class=page>
+<h2>Transactions</h2>
+<table><thead><tr><th>Height</th><th>Address</th><th>Amount</th></tr></thead><tbody id=txs></tbody></table>
+</div>
+<div id=mine class=page>
+<h2>Mining</h2>
+<input id=nblocks value="1" style=width:80px> blocks<br>
+<button class=act onclick="doMine()">Mine</button>
+<button class=act onclick="doMineCont()">Mine Continuous</button>
+</div>
+<div id=addr class=page>
+<h2>Addresses</h2>
+<table><thead><tr><th>#</th><th>Address</th><th>Balance</th></tr></thead><tbody id=addrs></tbody></table>
+</div>
+<script>
+function tab(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));document.getElementById(id).classList.add('on');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));document.getElementById('t'+id).classList.add('on');if(id=='tx')loadTx();if(id=='addr')loadAddr();}
+async function refresh(){try{const r=await getInfo();const d=JSON.parse(r);document.getElementById('h').textContent=d.height;document.getElementById('bal').textContent=(d.balance/1e8).toFixed(8)+' ZiZZ';}catch(e){}}
+async function doMine(){const n=parseInt(document.getElementById('nblocks').value)||1;await mineN(n);refresh();}
+async function doMineCont(){for(let i=0;i<5;i++){await mineN(1);await new Promise(r=>setTimeout(r,200));}refresh();}
+async function doNew(){const a=await newAddress();document.getElementById('newaddr').textContent=a;refresh();}
+async function doSend(){const to=document.getElementById('to').value;const amt=Math.floor(parseFloat(document.getElementById('amt').value)*1e8);if(to&&amt){await send(to,amt);refresh();alert('sent');}}
+async function loadTx(){const r=await listTxs();const d=JSON.parse(r);document.getElementById('txs').innerHTML=d.map(t=>`<tr><td>${t.h}</td><td>${t.a.slice(0,18)}...</td><td>${(t.s/1e8).toFixed(8)}</td></tr>`).join('');}
+async function loadAddr(){const r=await listAddrs();const d=JSON.parse(r);document.getElementById('addrs').innerHTML=d.map((a,i)=>`<tr><td>${i+1}</td><td>${a.a.slice(0,20)}...</td><td>${(a.b/1e8).toFixed(8)}</td></tr>`).join('');}
+setInterval(refresh,2000);refresh();
+</script></body></html>
